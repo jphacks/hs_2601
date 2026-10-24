@@ -59,3 +59,19 @@ Web アプリ（PWA）として動作し、URL を開くだけで利用できる
 * VLM による目印抽出と、経路の方位差から算出した矢印の画像への描画
 * 端末内で完結する到達・通り過ぎ・経路外れの判定ロジック
 * 詳細は [docs/overview.md](./docs/overview.md)、[docs/creator.md](./docs/creator.md)、[docs/follower.md](./docs/follower.md) を参照
+
+## ディレクトリ構成
+
+```
+hs_2601/
+├── frontend/   # Web フロントエンド（Vite + React + TypeScript、PWA）
+├── backend/    # API サーバー（FastAPI / Python）
+└── docs/       # 企画・仕様・設計資料
+```
+
+- 全体像: [docs/overview.md](docs/overview.md)
+- 作る人側: [docs/creator.md](docs/creator.md)
+- 参加者側: [docs/follower.md](docs/follower.md)
+- 詳細なディレクトリ構成と各ファイルの関係: [docs/directory-structure.md](docs/directory-structure.md)
+
+機能は段階的に追加する。各ディレクトリ内の README.md に役割を記載する。

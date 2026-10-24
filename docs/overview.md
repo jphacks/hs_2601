@@ -3,6 +3,7 @@
 関連ドキュメント:
 - [creator.md](./creator.md) — 作る人（道案内を作成・公開する側）の作業
 - [follower.md](./follower.md) — 参加者（道案内をたどる側）の作業
+- [directory-structure.md](./directory-structure.md) — ディレクトリ構成と各ファイルの関係
 
 ## TODO
 

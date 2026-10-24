@@ -1,0 +1,25 @@
+# 環境変数・秘密情報
+.env
+.env.*
+!.env.example
+
+# Node (frontend)
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Python (backend)
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS / エディタ
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
