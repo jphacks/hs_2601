@@ -24,6 +24,7 @@ from app.services.creator.geo import (
     nearest_vertex,
 )
 from app.services.creator.route import decode_polyline
+from app.services.creator.text import normalize_instruction
 
 # しきい値。実データで調整する
 MIN_TURN_DEG = 20.0  # これ未満の方位変化は「道なり」とみなす
@@ -147,7 +148,7 @@ def extract_turns(route: Route, origin: Place, destination: Place, creator_photo
                 heading_out=c.heading_out,
                 maneuver=c.maneuver,
                 turn=d.turn or "straight",
-                instruction=c.instruction,
+                instruction=normalize_instruction(c.instruction, d.turn or "straight"),
                 distance_to_next_m=max(dist, 0),
                 image_source="creator_photo" if c.source == "creator_photo" else None,
             )
