@@ -18,6 +18,7 @@ from app.external.vlm.factory import make_vlm_client
 from app.schemas.exploration import Exploration
 from app.services.creator.cache import FileCache
 from app.services.creator.contact import TURN_LABEL, render_contact_html
+from scripts.snapshot_map import write_snapshots
 from app.services.creator.landmark import evaluate_landmarks
 from app.services.creator.route import decode_polyline  # noqa: F401
 from scripts.streetview import build_map
@@ -26,6 +27,7 @@ from scripts.streetview import build_map
 def main() -> None:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--no-png", action="store_true", help="map.png と contact.png を更新しない")
     ap.add_argument("--from-route", type=Path, required=True)
     ap.add_argument("--no-vlm", action="store_true")
     ap.add_argument("--no-cache", action="store_true")
@@ -54,6 +56,8 @@ def main() -> None:
     for i, msg in stats.errors.items():
         print(f"  ! 地点 {i}: {msg}")
     print(f"\n一覧: {d / 'contact.html'}")
+    if not args.no_png:
+        write_snapshots(d)
 
 
 if __name__ == "__main__":

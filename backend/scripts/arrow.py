@@ -14,11 +14,13 @@ from pathlib import Path
 from app.schemas.exploration import Exploration
 from app.services.creator.arrow import draw_arrows
 from app.services.creator.contact import TURN_LABEL, render_contact_html
+from scripts.snapshot_map import write_snapshots
 from scripts.streetview import build_map
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--no-png", action="store_true", help="map.png と contact.png を更新しない")
     ap.add_argument("--from-route", type=Path, required=True)
     args = ap.parse_args()
     d: Path = args.from_route
@@ -33,6 +35,8 @@ def main() -> None:
         src = "VLM" if p.index in stats.with_vlm_path else ("既定形" if p.arrow_image else "-")
         print(f"  {p.index:2d} {TURN_LABEL[p.turn]:<6} {p.arrow_image or '(画像なし)':<22} {src}")
     print(f"\n一覧: {d / 'contact.html'}")
+    if not args.no_png:
+        write_snapshots(d)
 
 
 if __name__ == "__main__":

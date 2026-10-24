@@ -35,6 +35,17 @@ def snapshot(out_dir: Path, name: str, size: str | None = None) -> Path | None:
     return png if png.exists() else None
 
 
+def write_snapshots(out_dir: Path, names: tuple[str, ...] = ("map", "contact")) -> dict[str, Path | None]:
+    """html を書き換えた直後に呼び、同名の PNG も更新する。Firefox が無ければ案内だけ出して何もしない。"""
+    if not shutil.which("firefox"):
+        print("png: firefox が無いので省略（html をブラウザで開いてください）")
+        return {name: None for name in names}
+    results = {name: snapshot(out_dir, name) for name in names}
+    for name, png in results.items():
+        print(f"{name}.png: {png if png else '失敗（html が無いか描画エラー）'}")
+    return results
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, default=None, help="html があるディレクトリ（既定: backend/out）")

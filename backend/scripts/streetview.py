@@ -20,6 +20,7 @@ from app.core.config import get_settings
 from app.external.google.street_view import StreetViewClient
 from app.schemas.exploration import Exploration
 from app.services.creator.contact import TURN_LABEL, render_contact_html
+from scripts.snapshot_map import write_snapshots
 from app.services.creator.mapview import MapSpec, Marker, render_map_html
 from app.services.creator.route import decode_polyline
 from app.core.config import get_settings as _gs  # noqa: F401
@@ -42,6 +43,7 @@ def build_map(e: Exploration, title: str) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--no-png", action="store_true", help="map.png と contact.png を更新しない")
     ap.add_argument("--from-route", type=Path, required=True, help="route.json があるディレクトリ")
     ap.add_argument("--offset-m", type=float, default=0.0, help="交差点の何 m 手前から撮るか（既定 0）")
     ap.add_argument("--fov", type=int, default=90)
@@ -79,6 +81,8 @@ def main() -> None:
         cam = p.street_view.heading if p.street_view else (p.heading or 0)
         print(f"  {p.index:2d} {TURN_LABEL[p.turn]:<6} 進入 {p.heading or 0:3.0f}° → カメラ {cam:3.0f}°  候補 {len(p.candidates)} 枚  {sv}")
     print(f"\n一覧: {d / 'contact.html'}\n地図: {d / 'map.html'}")
+    if not args.no_png:
+        write_snapshots(d)
 
 
 if __name__ == "__main__":

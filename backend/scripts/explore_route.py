@@ -6,7 +6,7 @@
   python -m scripts.explore_route "大阪駅" "グランフロント大阪" --no-cache     # キャッシュを使わず必ず API を叩く
 
 処理: geocode → route → turns → streetview（候補を複数）→ landmark（VLM が採点して 1 枚を選び、目印文と矢印の経路を返す）→ arrow（曲線の矢印を描く）
-出力: out/route.json, out/images/, out/raw/, out/map.html, out/contact.html（--png で map.png, contact.png も）
+出力: out/route.json, out/images/, out/raw/, out/map.html, out/contact.html, map.png, contact.png（PNG は --no-png で省略）
 キャッシュ: 同じ地名・座標・パノラマ・画像+プロンプトなら backend/.cache/ を再利用する。
 VLM のキーが無いときは --no-vlm と同じ（フォールバック文のみ）。
 """
@@ -30,6 +30,7 @@ from app.services.creator.arrow import draw_arrows
 from app.services.creator.landmark import evaluate_landmarks
 from app.services.creator.streetview import StreetViewOptions, fetch_candidates
 from app.services.creator.turns import extract_turns
+from scripts.snapshot_map import write_snapshots
 from scripts.streetview import build_map
 
 
@@ -45,7 +46,7 @@ def main() -> None:
     ap.add_argument("--pitch", type=int, default=0)
     ap.add_argument("--offset-m", type=float, default=0.0)
     ap.add_argument("--no-vlm", action="store_true", help="VLM の採点を行わず、フォールバック文だけ付ける")
-    ap.add_argument("--png", action="store_true", help="map.png と contact.png も出す（Firefox が必要）")
+    ap.add_argument("--no-png", action="store_true", help="map.png と contact.png を出さない（既定は Firefox があれば出す）")
     args = ap.parse_args()
 
     settings = get_settings()
@@ -101,11 +102,8 @@ def main() -> None:
     for p in e.points:
         print(f"  {p.index:2d} {TURN_LABEL[p.turn]:<6} 次まで {p.distance_to_next_m:4d} m  候補 {len(p.candidates)}  {p.landmark or ''}")
     print(f"\n一覧: {out_dir / 'contact.html'}\n地図: {out_dir / 'map.html'}")
-    if args.png:
-        from scripts.snapshot_map import snapshot
-        for name in ("map", "contact"):
-            png = snapshot(out_dir, name)
-            print(f"{name}.png: {png if png else '失敗（Firefox が無いか描画エラー）'}")
+    if not args.no_png:
+        write_snapshots(out_dir)
 
 
 if __name__ == "__main__":

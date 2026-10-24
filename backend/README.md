@@ -72,12 +72,12 @@ python -m scripts.geocode --fixture tests/fixtures/geocode_sample.json --out ./o
 `out/map.html` は Leaflet + 地理院タイル（国土地理院）で描くので、表示に API キーは不要。
 ピンをクリックすると正式住所と座標が出る。開き方は `explorer.exe out/map.html`（WSL）。
 
-画像にして共有したいときは、Firefox があれば次で `out/map.png` と `out/contact.png` ができる。
+Firefox があれば、`map.html` / `contact.html` を書き換えるスクリプト（`explore_route`、`streetview`、`landmark`、`arrow`）は
+同じ場所の `map.png` と `contact.png` も毎回更新する。省略したいときは `--no-png`。手動で作り直すときは次。
 
 ```bash
 python -m scripts.snapshot_map --out ./out             # 両方
 python -m scripts.snapshot_map --out ./out --only map  # 地図だけ
-python -m scripts.explore_route "出発地" "目的地" --png   # 一括実行と同時に出す
 ```
 
 Geocoding API の挙動:
