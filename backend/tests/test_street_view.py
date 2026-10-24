@@ -157,7 +157,7 @@ def test_出発点は前方に探す(tmp_path: Path) -> None:
     assert lng1 > lng0  # 2 回目の候補は東（前方）
 
 
-def test_候補は最大5枚_出発点と目的地は位置違いで複数(tmp_path: Path) -> None:
+def test_候補は最大8枚_出発点と目的地は位置違いで複数(tmp_path: Path) -> None:
     from app.services.creator.streetview import fetch_candidates, variants_for, ENDPOINT_VARIANTS, TURN_VARIANTS
     n = 0
 
@@ -175,5 +175,5 @@ def test_候補は最大5枚_出発点と目的地は位置違いで複数(tmp_p
     turn_pt = e.points[0].model_copy(update={"maneuver": "TURN_RIGHT", "heading_out": 170.0})
     assert variants_for(turn_pt) is TURN_VARIANTS
     e2, _ = fetch_candidates(client, e, tmp_path)
-    assert [len(p.candidates) for p in e2.points] == [5, 5]
-    assert {c.image for c in e2.points[0].candidates} == {f"images/000_c{i}.jpg" for i in range(5)}
+    assert [len(p.candidates) for p in e2.points] == [8, 8]
+    assert {c.image for c in e2.points[0].candidates} == {f"images/000_c{i}.jpg" for i in range(8)}

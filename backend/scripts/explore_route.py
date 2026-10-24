@@ -5,7 +5,7 @@
   python -m scripts.explore_route "大阪駅" "グランフロント大阪" --via "梅田スカイビル" --out ./out
   python -m scripts.explore_route "大阪駅" "グランフロント大阪" --no-cache     # キャッシュを使わず必ず API を叩く
 
-処理: geocode → route → turns → streetview（候補を複数）→ landmark（VLM が採点して 1 枚を選び、目印文を付ける）
+処理: geocode → route → turns → streetview（候補を複数）→ landmark（VLM が採点して 1 枚を選び、目印文と矢印の経路を返す）→ arrow（曲線の矢印を描く）
 出力: out/route.json, out/images/, out/raw/, out/map.html, out/contact.html（--png で map.png, contact.png も）
 キャッシュ: 同じ地名・座標・パノラマ・画像+プロンプトなら backend/.cache/ を再利用する。
 VLM のキーが無いときは --no-vlm と同じ（フォールバック文のみ）。
@@ -26,6 +26,7 @@ from app.services.creator.cache import FileCache
 from app.services.creator.contact import TURN_LABEL, render_contact_html
 from app.services.creator.geocode import geocode_queries
 from app.services.creator.route import compute_route
+from app.services.creator.arrow import draw_arrows
 from app.services.creator.landmark import evaluate_landmarks
 from app.services.creator.streetview import StreetViewOptions, fetch_candidates
 from app.services.creator.turns import extract_turns
@@ -57,23 +58,23 @@ def main() -> None:
     geo = geocode_queries(GeocodingClient(key), [args.origin, *args.via, args.destination], cache)
     origin, dest, via = geo.places[0], geo.places[-1], geo.places[1:-1]
     (out_dir / "raw" / "geocode.json").write_text(json.dumps(geo.raw, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[2/6] geocode: {origin.query} ({origin.lat:.5f},{origin.lng:.5f}) → {dest.query} ({dest.lat:.5f},{dest.lng:.5f})")
+    print(f"[2/7] geocode: {origin.query} ({origin.lat:.5f},{origin.lng:.5f}) → {dest.query} ({dest.lat:.5f},{dest.lng:.5f})")
 
     # 3. route
     ro = compute_route(RoutesClient(key), origin, dest, via, cache)
     (out_dir / "raw" / "routes.json").write_text(json.dumps(ro.raw, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"[3/6] route: {ro.route.distance_m} m, 約 {ro.route.duration_s // 60} 分, {len(ro.route.steps)} ステップ")
+    print(f"[3/7] route: {ro.route.distance_m} m, 約 {ro.route.duration_s // 60} 分, {len(ro.route.steps)} ステップ")
 
     # 4. turns
     turns = extract_turns(ro.route, origin, dest)
     e = turns.exploration
-    print(f"[4/6] turns: 採用 {len(e.points)} / 候補 {len(turns.decisions)}")
+    print(f"[4/7] turns: 採用 {len(e.points)} / 候補 {len(turns.decisions)}")
 
     # 5. street view（候補を複数）
     opt = StreetViewOptions(offset_m=args.offset_m, fov=args.fov, pitch=args.pitch, heading_mode=args.heading)
     e, stats = fetch_candidates(StreetViewClient(key), e, out_dir, opt, cache=cache)
     n_cand = sum(len(p.candidates) for p in e.points)
-    print(f"[5/6] street view: 地点 {len(stats.fetched)} / なし {len(stats.missing)}, 候補 {n_cand} 枚")
+    print(f"[5/7] street view: 地点 {len(stats.fetched)} / なし {len(stats.missing)}, 候補 {n_cand} 枚")
 
     # 7. VLM が採点して 1 枚を選び、目印文を付ける
     vlm = None
@@ -81,12 +82,16 @@ def main() -> None:
         try:
             vlm = make_vlm_client(settings)
         except VlmError as err:
-            print(f"[6/6] VLM なし（{err}）→ フォールバック文のみ")
+            print(f"[6/7] VLM なし（{err}）→ フォールバック文のみ")
     e, lstats = evaluate_landmarks(vlm, e, out_dir, None if args.no_cache else FileCache(settings.cache_dir, "vlm"))
     if vlm:
-        print(f"[6/6] landmark ({vlm.model}): 評価 {len(lstats.evaluated)} / フォールバック {len(lstats.fallback)}")
+        print(f"[6/7] landmark ({vlm.model}): 評価 {len(lstats.evaluated)} / フォールバック {len(lstats.fallback)}")
         for i, msg in lstats.errors.items():
             print(f"      ! 地点 {i}: {msg}")
+
+    # 8. 矢印
+    e, astats = draw_arrows(e, out_dir)
+    print(f"[7/7] arrow: 描画 {len(astats.drawn)}（VLM 経路 {len(astats.with_vlm_path)}）/ 画像なし {len(astats.skipped)}")
 
     title = f"{origin.query} → {dest.query}（{e.total_distance_m} m, {len(e.points)} 地点）"
     (out_dir / "route.json").write_text(e.model_dump_json(indent=2), encoding="utf-8")

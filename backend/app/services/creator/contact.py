@@ -12,9 +12,10 @@ TURN_COLOR = {"left": "#f29100", "right": "#7b1fa2", "straight": "#1a73e8", "arr
 def render_contact_html(e: Exploration, title: str) -> str:
     cards = []
     for p in e.points:
+        shown = p.arrow_image or p.image
         img = (
-            f'<img src="{html.escape(p.image)}" alt="">'
-            if p.image
+            f'<img src="{html.escape(shown)}" alt="">'
+            if shown
             else '<div class="noimg">Street View なし</div>'
         )
         sv = p.street_view
@@ -26,7 +27,7 @@ def render_contact_html(e: Exploration, title: str) -> str:
             for i, c in enumerate(p.candidates):
                 chosen = " chosen" if p.chosen_candidate == i else ""
                 sc = c.score
-                label = f"目印 {sc.landmark} / 曲 {sc.turn} / 視点 {sc.view}" if sc else "未評価"
+                label = f"目印 {sc.landmark} / 曲 {sc.turn} / 矢印 {sc.arrow}" if sc else "未評価"
                 items.append(
                     f'<figure class="cand{chosen}"><img src="{html.escape(c.image)}" alt="">'
                     f'<figcaption>#{i} {html.escape(c.heading_mode)} {c.street_view.offset_m:.0f}m fov{c.street_view.fov}<br>{label}</figcaption></figure>'

@@ -138,7 +138,7 @@ python -m scripts.turns --from-raw ./out --out ./out     # キー無しで再判
 
 ### ステップ 5: Street View 画像の取得（候補を複数）
 
-`route.json` の各点について、向き・位置・画角の違う **候補画像を 5 枚**（重複は除去）取り、`candidates` に入れる。出発点・目的地は向きの違いが無いので位置をずらして 5 枚にする。
+`route.json` の各点について、向き・位置・画角の違う **候補画像を 8 枚**（重複は除去）取り、`candidates` に入れる。出発点・目的地は向きの違いが無いので位置をずらして 8 枚にする。
 `image` には先頭候補を仮採用し、ステップ 7 で VLM が選び直す。`--single` で従来どおり 1 枚だけ取ることもできる。
 
 ```bash
@@ -202,7 +202,7 @@ explorer.exe out/map.html         # 地図
 
 ### ステップ 7: VLM による採点と目印文（Gemini / Claude）
 
-候補画像を VLM に渡し、「目印のわかりやすさ」「どこで曲がるかのわかりやすさ」「人の視点に近いか」を 1〜5 で採点させて最良の 1 枚を採用し、目印の短い文章を `landmark` に入れる。
+候補画像を VLM に渡し、「目印のわかりやすさ」「どこで曲がるかのわかりやすさ」「矢印の描きやすさ」を 1〜5 で採点させて最良の 1 枚を採用し、目印の短い文章を `landmark` に、矢印の経路（画像内座標）を `candidates[].score.arrow_path` に入れる。
 
 ```bash
 # .env に GEMINI_API_KEY（Google AI Studio、無料枠）を書いておく
@@ -219,6 +219,19 @@ python -m scripts.landmark --from-route ./out/cases/4 --no-vlm     # VLM を使�
 - プロンプト: `app/external/vlm/prompts/evaluate.txt`
 
 `scripts.explore_route` はステップ 7 まで含めて一括実行する（キーが無ければフォールバックのみ、`--no-vlm` で明示的に省略）。
+
+### ステップ 8: 矢印の描画
+
+採用画像に、VLM が返した経路に沿って曲線の矢印を重ね、`arrow_image` に入れる。API 不要。
+
+```bash
+python -m scripts.arrow --from-route ./out/cases/4
+```
+
+- 色: 左 橙 / 右 紫 / 直進 青 / 到着 赤。白縁つきで写真の上でも読める。
+- 左右折なのに経路が曲がっていなければ、終点をその側へ寄せて必ず曲線にする。
+- VLM の経路が無い地点は turn ごとの既定形で描く。
+- `contact.html` と `map.html` は矢印入り画像を優先して表示する。`scripts.explore_route` はここまで一括で実行する。
 
 ## 構成
 
@@ -237,6 +250,8 @@ app/
 │       ├── geocoding.py   # Geocoding API クライアント
 │       ├── routes.py      # Routes API クライアント
 │       └── street_view.py # Street View Metadata / Static API クライアント
+├── imaging/
+│   └── arrow.py         # 曲線の矢印を描く（Pillow、純粋な描画）
 ├── external/vlm/
 │   ├── base.py          # VLM 共通インターフェース、返答 JSON の解釈
 │   ├── gemini.py        # Gemini API（REST、429 再試行）
@@ -250,7 +265,8 @@ app/
     │   ├── geo.py       # 方位・距離の純関数
     │   ├── turns.py     # ステップ 4: 曲がり角抽出 → route.json
     │   ├── streetview.py # ステップ 5: 画像取得（公式パノラマ優先、候補を複数）
-    │   ├── landmark.py  # ステップ 7: VLM 採点 → 1 枚選定 → 目印文
+    │   ├── landmark.py  # ステップ 7: VLM 採点 → 1 枚選定 → 目印文・矢印経路
+    │   ├── arrow.py     # ステップ 8: 矢印入り画像
     │   ├── cache.py     # 外部 API レスポンスのファイルキャッシュ
     │   ├── contact.py   # 確認用の画像一覧 HTML
     │   └── mapview.py   # 確認用の地図 HTML（Leaflet + 地理院タイル）
@@ -261,7 +277,8 @@ scripts/
 ├── turns.py             # ステップ 4 の確認コマンド
 ├── streetview.py        # ステップ 5 の確認コマンド
 ├── landmark.py          # ステップ 7 の確認コマンド
-├── explore_route.py     # ステップ 6: 2〜7 の一括実行
+├── arrow.py             # ステップ 8 の確認コマンド
+├── explore_route.py     # ステップ 6: 2〜8 の一括実行
 └── snapshot_map.py      # out/map.html を PNG にする（Firefox 使用）
 tests/
 ├── fixtures/            # route_sample.json、geocode_sample.json、routes_sample.json（実レスポンス）

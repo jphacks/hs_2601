@@ -29,12 +29,21 @@ class StreetViewMeta(BaseModel):
     offset_m: float = 0.0  # 交差点の何 m 手前のパノラマを使ったか
 
 
+class ArrowPoint(BaseModel):
+    """画像内の座標。左上 (0,0)、右下 (1,1)。"""
+
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+
+
 class VlmScore(BaseModel):
     landmark: int = Field(ge=1, le=5)  # 目印のわかりやすさ
     turn: int = Field(ge=1, le=5)  # どこで曲がるかのわかりやすさ
-    view: int = Field(default=3, ge=1, le=5)  # 人の視点に近いか（目線の高さ・画角・歩道からの眺め）
+    arrow: int = Field(default=3, ge=1, le=5)  # 矢印の描きやすさ・わかりやすさ（曲がる先の路面が見えているか）
+    view: int = Field(default=3, ge=1, le=5)  # 人の視点に近いか（現在は評価軸から外している）
     landmark_text: str = ""  # この画像での目印の短い説明
     reason: str = ""
+    arrow_path: list[ArrowPoint] = Field(default_factory=list)  # 歩行者の足元から曲がる先の路面までの経路（3〜6 点）
 
 
 class ImageCandidate(BaseModel):

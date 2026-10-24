@@ -33,7 +33,8 @@ def build_map(e: Exploration, title: str) -> str:
     markers = []
     for p in e.points:
         color = "green" if p.maneuver.upper() == "DEPART" else COLOR[p.turn]
-        img = f'<br><img src="{html.escape(p.image)}" width="280">' if p.image else "<br>(Street View なし)"
+        shown = p.arrow_image or p.image
+        img = f'<br><img src="{html.escape(shown)}" width="280">' if shown else "<br>(Street View なし)"
         popup = f"<b>{p.index} {TURN_LABEL[p.turn]}</b> 次まで {p.distance_to_next_m} m<br>{html.escape(p.instruction)}{img}"
         markers.append(Marker(p.lat, p.lng, str(p.index), popup, color))
     return render_map_html(MapSpec(title=title, markers=markers, path=decode_polyline(e.polyline)))

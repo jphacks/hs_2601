@@ -144,7 +144,7 @@ class Variant:
     fov: int = 90
 
 
-TARGET_CANDIDATES = 5
+TARGET_CANDIDATES = 8
 
 # 曲がり角用。重複を除いて TARGET_CANDIDATES 枚になるまで上から順に試す
 TURN_VARIANTS: tuple[Variant, ...] = (
@@ -153,9 +153,15 @@ TURN_VARIANTS: tuple[Variant, ...] = (
     Variant("departure", 0.0),       # 入る道が正面
     Variant("bisector", 10.0),       # 10 m 手前から。交差点が前方に見える
     Variant("approach", 10.0),
-    Variant("bisector", 0.0, 110),   # 広角。人の視野に近い
+    Variant("bisector", 0.0, 110),   # 広角。曲がる先が枠に入りやすい
     Variant("bisector", 20.0),
     Variant("approach", 0.0, 110),
+    Variant("bisector", 5.0),
+    Variant("departure", 10.0),
+    Variant("approach", 20.0),
+    Variant("bisector", 10.0, 110),
+    Variant("bisector", 30.0),
+    Variant("approach", 30.0),
 )
 
 # 出発点・目的地用。向きの違いが無いので、位置（出発点は前方、目的地は手前）と画角を変える
@@ -168,6 +174,12 @@ ENDPOINT_VARIANTS: tuple[Variant, ...] = (
     Variant("approach", 10.0, 110),
     Variant("approach", 40.0),
     Variant("approach", 50.0),
+    Variant("approach", 5.0),
+    Variant("approach", 15.0),
+    Variant("approach", 20.0, 110),
+    Variant("approach", 60.0),
+    Variant("approach", 70.0),
+    Variant("approach", 80.0),
 )
 
 DEFAULT_VARIANTS = TURN_VARIANTS  # 互換のため

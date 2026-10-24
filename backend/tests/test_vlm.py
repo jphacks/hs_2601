@@ -15,8 +15,9 @@ FIXTURE = Path(__file__).parent / "fixtures" / "route_sample.json"
 JPEG = b"\xff\xd8\xff\xe0fake"
 
 GOOD = {"evaluations": [
-    {"index": 0, "landmark_score": 2, "turn_score": 3, "view_score": 2, "landmark": "目印なし", "reason": "壁だけ"},
-    {"index": 1, "landmark_score": 5, "turn_score": 4, "view_score": 5, "landmark": "赤い看板のコンビニ", "reason": "看板が大きい"},
+    {"index": 0, "landmark_score": 2, "turn_score": 3, "arrow_score": 2, "landmark": "目印なし", "reason": "壁だけ", "arrow_path": []},
+    {"index": 1, "landmark_score": 5, "turn_score": 4, "arrow_score": 5, "landmark": "赤い看板のコンビニ", "reason": "看板が大きい",
+     "arrow_path": [{"x": 0.5, "y": 0.95}, {"x": 0.5, "y": 0.6}, {"x": 1.2, "y": 0.5}]},
 ], "best_index": 1}
 
 
@@ -103,7 +104,9 @@ def test_最良の候補が採用され目印文が入る(tmp_path: Path) -> Non
     assert p.chosen_candidate == 1
     assert p.image == "images/000_c1.jpg"
     assert p.landmark == "赤い看板のコンビニ"
-    assert p.candidates[0].score is not None and p.candidates[0].score.turn == 3 and p.candidates[0].score.view == 2
+    assert p.candidates[0].score is not None and p.candidates[0].score.turn == 3 and p.candidates[0].score.arrow == 2
+    best = p.candidates[1].score
+    assert best is not None and [(a.x, a.y) for a in best.arrow_path] == [(0.5, 0.95), (0.5, 0.6), (1.0, 0.5)]  # 範囲外は丸める
     assert stats.evaluated == [0] and stats.fallback == [1]  # 候補の無い目的地はフォールバック
     assert e2.points[1].landmark == "目的地です"
     assert e.points[0].chosen_candidate is None  # 元は変更されない
@@ -131,9 +134,10 @@ def test_fallback_text_とプロンプト() -> None:
     p = e.points[0].model_copy(update={"turn": "left", "instruction": "", "distance_to_next_m": 50})
     assert fallback_text(p) == "左折（次まで 50 m）"
     prompt = build_prompt(p, 3)
-    assert "3 枚" in prompt and "左折" in prompt and "best_index" in prompt and "view_score" in prompt
+    assert "3 枚" in prompt and "左折" in prompt and "best_index" in prompt and "arrow_path" in prompt
 
 
-def test_view_score_が無ければ3扱い() -> None:
+def test_arrow_score_や経路が無くても解釈できる() -> None:
     body = {"evaluations": [{"index": 0, "landmark_score": 4, "turn_score": 4, "landmark": "x", "reason": "y"}], "best_index": 0}
-    assert parse_evaluation(json.dumps(body), 1).evaluations[0].view == 3
+    ev = parse_evaluation(json.dumps(body), 1).evaluations[0]
+    assert ev.arrow == 3 and ev.arrow_path == []

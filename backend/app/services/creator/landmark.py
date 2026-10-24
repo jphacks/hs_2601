@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.external.vlm.base import Evaluation, VlmClient, VlmError
-from app.schemas.exploration import Exploration, ExplorationPoint, VlmScore
+from app.schemas.exploration import ArrowPoint, Exploration, ExplorationPoint, VlmScore
 from app.services.creator.cache import FileCache, cache_key
 
 log = logging.getLogger(__name__)
@@ -60,7 +60,8 @@ def _evaluate_point(client: VlmClient, p: ExplorationPoint, out_dir: Path, cache
 def apply_evaluation(p: ExplorationPoint, ev: Evaluation) -> ExplorationPoint:
     by_index = {e.index: e for e in ev.evaluations}
     cands = [
-        c.model_copy(update={"score": VlmScore(landmark=e.landmark, turn=e.turn, view=e.view, landmark_text=e.landmark_text, reason=e.reason)})
+        c.model_copy(update={"score": VlmScore(landmark=e.landmark, turn=e.turn, arrow=e.arrow, view=e.view, landmark_text=e.landmark_text,
+                                  reason=e.reason, arrow_path=[ArrowPoint(x=x, y=y) for x, y in e.arrow_path])})
         if (e := by_index.get(i)) else c
         for i, c in enumerate(p.candidates)
     ]

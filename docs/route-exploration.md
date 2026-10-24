@@ -85,7 +85,7 @@ out/
 | `image_source` | `"street_view"` \| `"creator_photo"` \| null | 画像の出所。作成者の写真を差し込む段階で `creator_photo` が増える | streetview |
 | `street_view` | object \| null | 取得時のパラメータ（pano_id、撮影年月、heading、fov、pitch、copyright、offset_m）。copyright に Google を含めば公式撮影 | streetview |
 | `landmark` | string \| null | VLM が選んだ画像での目印の短い説明。VLM 不可なら案内文と距離からのフォールバック文 | landmark |
-| `arrow_image` | string \| null | **後続の矢印描画ステップが埋める。** 矢印を重ねた画像の相対パス | arrow |
+| `arrow_image` | string \| null | 採用画像に曲線の矢印を重ねた画像の相対パス。経路は VLM の `arrow_path`、無ければ turn ごとの既定形 | arrow |
 
 ### 決めごと
 
@@ -114,7 +114,7 @@ out/
 | 5 | `external/google/street_view.py` + `services/creator/streetview.py` + `contact.py` + `scripts/streetview.py` | `python -m scripts.streetview --from-route DIR` で各地点に **候補画像が複数**（向き 3 種 × 位置 2 種、重複除去）並ぶ（完了） | 4 |
 | 6 | `scripts/explore_route.py` + `services/creator/cache.py` | コマンド 1 発で `out/` 一式ができる。同じ入力は `.cache/` を再利用。7 も組み込み済み（完了） | 2〜5、7 |
 | 7 | `external/vlm/`（Gemini / Claude）+ `services/creator/landmark.py` + `scripts/landmark.py` | VLM が候補ごとに「目印のわかりやすさ」「曲がる場所のわかりやすさ」を 1〜5 で採点し、最良の 1 枚を `image` に採用、`landmark` に目印文（完了。既定は Gemini 2.5 Flash-Lite の無料枠） | 5、VLM キー |
-| 8 | （後続）`services/creator/arrow.py` | `arrow_image` が埋まる | 6 |
+| 8 | `imaging/arrow.py` + `services/creator/arrow.py` + `scripts/arrow.py` | VLM が返した画像内の経路（`arrow_path`）に沿って曲線の矢印を描き `arrow_image` に入れる（完了） | 7 |
 
 - 4 は API キーが届く前でも着手できる。3 で取った生レスポンスを `tests/fixtures/routes_sample.json` として置く。
 - 6 まで終われば中間発表のデモ素材になる。7 と 8 は並行で進められる。
@@ -162,16 +162,21 @@ out/
 1 地点につき Street View を複数枚取り、VLM に採点させて 1 枚を選ぶ。
 
 ### 候補（ステップ 5）
-1 地点 **5 枚** を目標に、次の順で試し、同じパノラマ・同じ向き・同じ画角の重複は捨てる。
+1 地点 **8 枚** を目標に、次の順で試し、同じパノラマ・同じ向き・同じ画角の重複は捨てる。
 
-曲がり角: bisector/0 m → approach/0 m → departure/0 m → bisector/10 m → approach/10 m → bisector/0 m/fov110 → bisector/20 m → approach/0 m/fov110
+曲がり角: bisector/0 m → approach/0 m → departure/0 m → bisector/10 m → approach/10 m → bisector/0 m/fov110 → bisector/20 m → approach/0 m/fov110 → bisector/5 m → departure/10 m → approach/20 m → bisector/10 m/fov110 → bisector/30 m → approach/30 m
 
-出発点・目的地（向きの違いが無い）: 位置を 0 / 10 / 20 / 30 / 40 / 50 m とずらし（出発点は前方、目的地は手前）、fov 110 も混ぜる。
+出発点・目的地（向きの違いが無い）: 位置を 0〜80 m の範囲でずらし（出発点は前方、目的地は手前）、fov 110 も混ぜる。
 
 ### 採点（ステップ 7）
 - 1 地点につき VLM を 1 回呼び、全候補を一度に渡す（画像 N 枚 + プロンプト）。
-- 返答は JSON 固定: 候補ごとの `landmark_score`（目印のわかりやすさ 1〜5）、`turn_score`（どこで曲がるかのわかりやすさ 1〜5）、`view_score`（**人の視点に近いか** 1〜5。歩道の目線・自然な画角なら高く、車道の高所・船上・屋内・極端な広角は低い）、`landmark`（20 字以内の目印文）、`reason`、全体の `best_index`。
-- 3 つの合計が高いものを優先し、同点なら `turn_score` を優先する。
+- 返答は JSON 固定: 候補ごとの `landmark_score`（目印のわかりやすさ 1〜5）、`turn_score`（どこで曲がるかのわかりやすさ 1〜5）、`arrow_score`（**矢印の描きやすさ・わかりやすさ** 1〜5。足元から曲がる先の路面まで道路が途切れず見えているか）、`landmark`（20 字以内の目印文）、`reason`、`arrow_path`（画像内の矢印経路。左上 (0,0)〜右下 (1,1) の 3〜6 点）、全体の `best_index`。
+- 3 つの合計が高いものを優先し、同点なら `arrow_score`、次に `turn_score` を優先する。「人の視点に近いか」は評価軸から外した（`view_score` は互換のため残るが未使用）。
+
+### 矢印（ステップ 8）
+- 採用候補の `arrow_path` を Catmull-Rom 曲線でつなぎ、白縁 + turn 色（左 橙 / 右 紫 / 直進 青 / 到着 赤）の線と矢じりを描く。
+- 左折なのに終点が左側（x ≤ 0.3）に無い、右折なのに右側（x ≥ 0.7）に無い場合は、終点をその側へ寄せて必ず曲線にする。
+- `arrow_path` が無い（VLM 不可）地点は turn ごとの既定形（足元から奥へ、左右は横へ抜ける）。
 - プロンプトは `backend/app/external/vlm/prompts/evaluate.txt`。
 - 画像の SHA-256 + プロンプト + モデル名でキャッシュする。同じ候補に対する再実行は無料。
 - VLM が使えない・失敗した・候補が無い地点は、Routes API の案内文と距離からのフォールバック文にする。
