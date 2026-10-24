@@ -31,7 +31,7 @@ class ExplorationPoint(BaseModel):
     index: int
     lat: float
     lng: float
-    heading: float | None = Field(default=None, ge=0, lt=360)
+    heading: float | None = Field(default=None, ge=0, lt=360)  # 交差点に近づく向き（出発点は出て行く向き）
     maneuver: str
     turn: Turn
     instruction: str

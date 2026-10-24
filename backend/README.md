@@ -115,6 +115,25 @@ Routes API の挙動:
 - 駅構内など屋内区間のステップは `navigationInstruction` が無く、案内文・maneuver が空になる。
 - `routes` が空、または HTTP 403（API 未有効化・キー制限）は `RoutesError` になる。
 
+### ステップ 4: 曲がり角抽出（中間形式 route.json の生成）
+
+Routes API のステップ境界を候補にし、採用・不採用を判定して `route.json` を作る。
+ロジックの詳細は [docs/route-exploration.md](../docs/route-exploration.md) 4 章。
+
+```bash
+python -m scripts.turns "大阪駅" "グランフロント大阪" --out ./out
+python -m scripts.turns --from-raw ./out --out ./out     # キー無しで再判定（しきい値調整に使う）
+```
+
+出力:
+
+| ファイル | 内容 |
+|---|---|
+| `out/route.json` | 中間形式。画像は null（ステップ 5 で埋める） |
+| `out/map.html` | 採用点を色分け（緑 = 出発、青 = 直進、橙 = 左、紫 = 右、赤 = 目的地）、不採用点を灰色 ×。クリックで判定理由と方位差 |
+
+ターミナルにも候補ごとの判定一覧が出る。しきい値は `app/services/creator/turns.py` 冒頭の定数。
+
 ## 構成
 
 ```
@@ -135,11 +154,14 @@ app/
     ├── creator/
     │   ├── geocode.py   # ステップ 2: 地名 → Place
     │   ├── route.py     # ステップ 3: 徒歩経路、ポリライン復号
+    │   ├── geo.py       # 方位・距離の純関数
+    │   ├── turns.py     # ステップ 4: 曲がり角抽出 → route.json
     │   └── mapview.py   # 確認用の地図 HTML（Leaflet + 地理院タイル）
     └── follower/
 scripts/
 ├── geocode.py           # ステップ 2 の確認コマンド
 ├── route.py             # ステップ 3 の確認コマンド
+├── turns.py             # ステップ 4 の確認コマンド
 └── snapshot_map.py      # out/map.html を PNG にする（Firefox 使用）
 tests/
 ├── fixtures/            # route_sample.json、geocode_sample.json、routes_sample.json（実レスポンス）
