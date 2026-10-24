@@ -1,0 +1,190 @@
+{
+  "routes": [
+    {
+      "legs": [
+        {
+          "distanceMeters": 339,
+          "startLocation": {
+            "latLng": {
+              "latitude": 34.7020513,
+              "longitude": 135.4961442
+            }
+          },
+          "endLocation": {
+            "latLng": {
+              "latitude": 34.7039192,
+              "longitude": 135.4939567
+            }
+          },
+          "steps": [
+            {
+              "distanceMeters": 2,
+              "polyline": {
+                "encodedPolyline": "yvxrE{a_zX@C"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.7020513,
+                  "longitude": 135.4961442
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.7020352,
+                  "longitude": 135.49615559999998
+                }
+              },
+              "navigationInstruction": {
+                "maneuver": "DEPART",
+                "instructions": "南東に進む"
+              }
+            },
+            {
+              "distanceMeters": 124,
+              "polyline": {
+                "encodedPolyline": "wvxrE_b_zXEKKBY\\yA`Au@V"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.7020352,
+                  "longitude": 135.49615559999998
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.702976899999996,
+                  "longitude": 135.4956016
+                }
+              }
+            },
+            {
+              "distanceMeters": 14,
+              "polyline": {
+                "encodedPolyline": "s|xrEo~~yXSN"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.702976899999996,
+                  "longitude": 135.4956016
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.7030823,
+                  "longitude": 135.4955207
+                }
+              }
+            },
+            {
+              "distanceMeters": 129,
+              "polyline": {
+                "encodedPolyline": "g}xrE_~~yXEPa@h@M`@[~C"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.7030823,
+                  "longitude": 135.4955207
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.703488,
+                  "longitude": 135.49424679999998
+                }
+              }
+            },
+            {
+              "distanceMeters": 20,
+              "polyline": {
+                "encodedPolyline": "y_yrEav~yXS@KN"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.703488,
+                  "longitude": 135.49424679999998
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.703649,
+                  "longitude": 135.49416499999998
+                }
+              }
+            },
+            {
+              "distanceMeters": 4,
+              "polyline": {
+                "encodedPolyline": "y`yrEou~yXABC?"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.703649,
+                  "longitude": 135.49416499999998
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.7036818,
+                  "longitude": 135.4941424
+                }
+              },
+              "navigationInstruction": {
+                "maneuver": "DEPART",
+                "instructions": "北西に進む"
+              }
+            },
+            {
+              "distanceMeters": 22,
+              "polyline": {
+                "encodedPolyline": "_ayrEku~yXCf@"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.7036818,
+                  "longitude": 135.4941424
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.703702,
+                  "longitude": 135.4939378
+                }
+              },
+              "navigationInstruction": {
+                "maneuver": "TURN_LEFT",
+                "instructions": "左折して 北梅田通/大阪市道九条梅田線 に向かう"
+              }
+            },
+            {
+              "distanceMeters": 24,
+              "polyline": {
+                "encodedPolyline": "cayrEct~yXk@C"
+              },
+              "startLocation": {
+                "latLng": {
+                  "latitude": 34.703702,
+                  "longitude": 135.4939378
+                }
+              },
+              "endLocation": {
+                "latLng": {
+                  "latitude": 34.7039192,
+                  "longitude": 135.4939567
+                }
+              },
+              "navigationInstruction": {
+                "maneuver": "TURN_RIGHT",
+                "instructions": "右折して北梅田通/大阪市道九条梅田線に入る\n目的地は前方右側です"
+              }
+            }
+          ]
+        }
+      ],
+      "distanceMeters": 383,
+      "duration": "327s",
+      "polyline": {
+        "encodedPolyline": "yvxrE{a_zX@CEKKBY\\yA`Au@VSNEPa@h@M`@[~CS@KNABC?Cf@k@C"
+      }
+    }
+  ]
+}

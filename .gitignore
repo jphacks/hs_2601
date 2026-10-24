@@ -23,3 +23,6 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# 経路探索の出力
+backend/out/

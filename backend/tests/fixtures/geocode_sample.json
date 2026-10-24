@@ -1,0 +1,239 @@
+{
+  "大阪駅": {
+    "results": [
+      {
+        "address_components": [
+          {
+            "long_name": "大阪駅",
+            "short_name": "大阪駅",
+            "types": [
+              "establishment",
+              "point_of_interest",
+              "train_station",
+              "transit_station"
+            ]
+          },
+          {
+            "long_name": "１",
+            "short_name": "１",
+            "types": [
+              "premise"
+            ]
+          },
+          {
+            "long_name": "１",
+            "short_name": "１",
+            "types": [
+              "political",
+              "sublocality",
+              "sublocality_level_4"
+            ]
+          },
+          {
+            "long_name": "３丁目",
+            "short_name": "３丁目",
+            "types": [
+              "political",
+              "sublocality",
+              "sublocality_level_3"
+            ]
+          },
+          {
+            "long_name": "梅田",
+            "short_name": "梅田",
+            "types": [
+              "political",
+              "sublocality",
+              "sublocality_level_2"
+            ]
+          },
+          {
+            "long_name": "北区",
+            "short_name": "北区",
+            "types": [
+              "political",
+              "sublocality",
+              "sublocality_level_1"
+            ]
+          },
+          {
+            "long_name": "大阪市",
+            "short_name": "大阪市",
+            "types": [
+              "locality",
+              "political"
+            ]
+          },
+          {
+            "long_name": "大阪府",
+            "short_name": "大阪府",
+            "types": [
+              "administrative_area_level_1",
+              "political"
+            ]
+          },
+          {
+            "long_name": "日本",
+            "short_name": "JP",
+            "types": [
+              "country",
+              "political"
+            ]
+          },
+          {
+            "long_name": "530-0001",
+            "short_name": "530-0001",
+            "types": [
+              "postal_code"
+            ]
+          }
+        ],
+        "formatted_address": "日本、〒530-0001 大阪府大阪市北区梅田３丁目１−１ 大阪駅",
+        "geometry": {
+          "location": {
+            "lat": 34.7024854,
+            "lng": 135.4959506
+          },
+          "location_type": "ROOFTOP",
+          "viewport": {
+            "northeast": {
+              "lat": 34.7033489302915,
+              "lng": 135.4979224
+            },
+            "southwest": {
+              "lat": 34.7006509697085,
+              "lng": 135.4932213
+            }
+          }
+        },
+        "place_id": "ChIJC6fjlY3mAGARSshZ6CLIrhs",
+        "plus_code": {
+          "compound_code": "PF2W+X9 大阪府大阪市",
+          "global_code": "8Q6QPF2W+X9"
+        },
+        "types": [
+          "establishment",
+          "point_of_interest",
+          "train_station",
+          "transit_station"
+        ]
+      }
+    ],
+    "status": "OK"
+  },
+  "グランフロント大阪": {
+    "results": [
+      {
+        "address_components": [
+          {
+            "long_name": "3-1",
+            "short_name": "",
+            "types": []
+          },
+          {
+            "long_name": "20",
+            "short_name": "20",
+            "types": [
+              "subpremise"
+            ]
+          },
+          {
+            "long_name": "４−１",
+            "short_name": "４−１",
+            "types": [
+              "premise"
+            ]
+          },
+          {
+            "long_name": "４",
+            "short_name": "４",
+            "types": [
+              "political",
+              "sublocality",
+              "sublocality_level_4"
+            ]
+          },
+          {
+            "long_name": "大深町",
+            "short_name": "大深町",
+            "types": [
+              "political",
+              "sublocality",
+              "sublocality_level_2"
+            ]
+          },
+          {
+            "long_name": "北区",
+            "short_name": "北区",
+            "types": [
+              "political",
+              "sublocality",
+              "sublocality_level_1"
+            ]
+          },
+          {
+            "long_name": "大阪市",
+            "short_name": "大阪市",
+            "types": [
+              "locality",
+              "political"
+            ]
+          },
+          {
+            "long_name": "大阪府",
+            "short_name": "大阪府",
+            "types": [
+              "administrative_area_level_1",
+              "political"
+            ]
+          },
+          {
+            "long_name": "日本",
+            "short_name": "JP",
+            "types": [
+              "country",
+              "political"
+            ]
+          },
+          {
+            "long_name": "530-0011",
+            "short_name": "530-0011",
+            "types": [
+              "postal_code"
+            ]
+          }
+        ],
+        "formatted_address": "日本、〒530-0011 大阪府大阪市北区大深町４−４−１ 20 3-1",
+        "geometry": {
+          "location": {
+            "lat": 34.7039162,
+            "lng": 135.4940095
+          },
+          "location_type": "ROOFTOP",
+          "viewport": {
+            "northeast": {
+              "lat": 34.7068257,
+              "lng": 135.4960877802915
+            },
+            "southwest": {
+              "lat": 34.7032675,
+              "lng": 135.4933898197085
+            }
+          }
+        },
+        "place_id": "ChIJAQAAB4_mAGAR1alcFGtOaAo",
+        "plus_code": {
+          "compound_code": "PF3V+HJ 大阪府大阪市",
+          "global_code": "8Q6QPF3V+HJ"
+        },
+        "types": [
+          "establishment",
+          "point_of_interest",
+          "shopping_mall",
+          "tourist_attraction"
+        ]
+      }
+    ],
+    "status": "OK"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "origin": { "query": "大阪駅", "lat": 34.7025, "lng": 135.4959 },
+  "destination": { "query": "グランフロント大阪", "lat": 34.7049, "lng": 135.4950 },
+  "polyline": "}pzrEqzjxXkAyBsB_D",
+  "total_distance_m": 480,
+  "points": [
+    {
+      "index": 0,
+      "lat": 34.7025,
+      "lng": 135.4959,
+      "heading": 85.0,
+      "maneuver": "DEPART",
+      "turn": "straight",
+      "instruction": "北東に進む",
+      "distance_to_next_m": 120,
+      "image": "images/001.jpg",
+      "image_source": "street_view",
+      "street_view": { "pano_id": "abc", "date": "2023-05", "heading": 85.0, "fov": 90, "pitch": 0 },
+      "landmark": null,
+      "arrow_image": null
+    },
+    {
+      "index": 1,
+      "lat": 34.7049,
+      "lng": 135.4950,
+      "heading": null,
+      "maneuver": "ARRIVE",
+      "turn": "arrive",
+      "instruction": "目的地に到着",
+      "distance_to_next_m": 0,
+      "image": null,
+      "image_source": null,
+      "street_view": null,
+      "landmark": null,
+      "arrow_image": null
+    }
+  ]
+}
