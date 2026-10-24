@@ -1,8 +1,6 @@
+import { CreatorHome } from '../components/CreatorHome'
+
+/** hooks と components を繋ぐだけ。ロジック・見た目はここに書かない */
 export function CreatorHomePage() {
-  return (
-    <main>
-      <h1>作る人</h1>
-      <p>道案内を作成・公開する画面（準備中）</p>
-    </main>
-  )
+  return <CreatorHome />
 }

@@ -75,3 +75,41 @@ hs_2601/
 - 詳細なディレクトリ構成と各ファイルの関係: [docs/directory-structure.md](docs/directory-structure.md)
 
 機能は段階的に追加する。各ディレクトリ内の README.md に役割を記載する。
+
+## 起動と画面確認
+
+ターミナルを 2 つ開き、フロントとバックをそれぞれ起動する。
+
+```bash
+# ターミナル 1: frontend
+cd frontend
+npm install        # 初回のみ
+npm run dev
+```
+
+```bash
+# ターミナル 2: backend
+cd backend
+python3 -m venv .venv && source .venv/bin/activate   # 初回のみ
+pip install -r requirements.txt                       # 初回のみ
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+ブラウザで次を開き、表示を確認する。
+
+| 確認対象 | URL | 期待する表示 |
+|---|---|---|
+| 作る人の画面 | http://localhost:5173/c | 「作る人」の見出し |
+| 参加者の画面 | http://localhost:5173/r/sample | 「参加者」「道案内 ID: sample」 |
+| バックエンド疎通 | http://localhost:8000/health | `{"status":"ok"}` |
+| API 一覧 | http://localhost:8000/docs | Swagger UI |
+
+### スマホから確認する
+
+`npm run dev` の出力に表示される `Network: http://192.168.x.x:5173/` を、同じ Wi-Fi に繋いだスマホで開く。
+カメラ・位置情報を使う機能は HTTPS が必要になるので、その段階で Cloudflare Tunnel か ngrok を使う。
+
+```bash
+# 例: ngrok
+ngrok http 5173
+```

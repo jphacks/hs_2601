@@ -2,18 +2,25 @@
 
 API サーバー（FastAPI / Python）。
 
-## 起動
+## 起動と疎通確認
 
 ```bash
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv .venv && source .venv/bin/activate   # 初回のみ
+pip install -r requirements.txt                       # 初回のみ
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- 疎通確認: http://localhost:8000/health
-- API ドキュメント: http://localhost:8000/docs
+| URL | 期待する表示 |
+|---|---|
+| http://localhost:8000/health | `{"status":"ok"}` |
+| http://localhost:8000/docs | Swagger UI（API 一覧） |
+
+コマンドラインから確認する場合:
+
+```bash
+curl http://localhost:8000/health
+```
 
 ## テスト
 
