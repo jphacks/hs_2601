@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from app.imaging.arrow import catmull_rom, default_path, draw_arrow
+from app.imaging.arrow import _dedupe, default_path, draw_arrow
 from app.schemas.exploration import ArrowPoint, Exploration, ImageCandidate, StreetViewMeta, VlmScore
 from app.services.creator.arrow import arrow_path_for, draw_arrows, ensure_turn_side
 
@@ -16,11 +16,9 @@ def blank_jpeg(w: int = 200, h: int = 200) -> bytes:
     return buf.getvalue()
 
 
-def test_曲線は制御点を通り滑らかに補間される() -> None:
-    pts = [(0.5, 0.95), (0.5, 0.6), (0.2, 0.5)]
-    curve = catmull_rom(pts, samples_per_segment=8)
-    assert curve[0] == pts[0] and curve[-1] == pts[-1]
-    assert len(curve) > len(pts)
+def test_近すぎる点は間引かれる() -> None:
+    pts = [(0.0, 0.0), (0.5, 0.0), (0.6, 0.0), (10.0, 0.0)]
+    assert _dedupe(pts, min_dist=1.0) == [(0.0, 0.0), (10.0, 0.0)]
 
 
 def test_矢印を描くと画像が変わりサイズは同じ() -> None:
@@ -44,7 +42,7 @@ def test_VLMの経路があればそれを使う(tmp_path: Path) -> None:
     e = Exploration.model_validate_json(FIXTURE.read_text(encoding="utf-8"))
     (tmp_path / "images").mkdir()
     (tmp_path / "images" / "000_c0.jpg").write_bytes(blank_jpeg())
-    score = VlmScore(landmark=4, turn=4, arrow=5, arrow_path=[ArrowPoint(x=0.5, y=0.9), ArrowPoint(x=0.5, y=0.6), ArrowPoint(x=0.9, y=0.5)])
+    score = VlmScore(here=4, arrow=5, arrow_path=[ArrowPoint(x=0.5, y=0.9), ArrowPoint(x=0.5, y=0.6), ArrowPoint(x=0.9, y=0.5)])
     cand = ImageCandidate(image="images/000_c0.jpg", heading_mode="bisector", street_view=StreetViewMeta(pano_id="P", heading=0), score=score)
     p0 = e.points[0].model_copy(update={"image": cand.image, "candidates": [cand], "chosen_candidate": 0, "turn": "right"})
     p1 = e.points[1].model_copy(update={"image": None})

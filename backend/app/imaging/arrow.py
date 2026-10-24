@@ -1,4 +1,5 @@
-"""画像に曲線の矢印を重ねる（Pillow）。純粋な描画だけで、route.json のことは知らない。"""
+"""画像に矢印を重ねる（Pillow）。VLM が打った点を直線で順につなぎ、終点に矢じりを付ける。
+単色（縁取りなし）。純粋な描画だけで、route.json のことは知らない。"""
 from __future__ import annotations
 
 import math
@@ -9,33 +10,25 @@ from PIL import Image, ImageDraw
 Point = tuple[float, float]
 
 COLORS = {"left": (242, 145, 0), "right": (123, 31, 162), "straight": (26, 115, 232), "arrive": (211, 47, 47)}
-OUTLINE = (255, 255, 255)
 
 
 def default_path(turn: str) -> list[Point]:
-    """VLM の経路が無いときの既定形。足元から奥へ進み、左右は横へ抜ける。"""
+    """VLM の点列が無いときの既定形。足元から奥へ進み、左右は横へ抜ける。"""
     if turn == "left":
-        return [(0.5, 0.95), (0.5, 0.62), (0.42, 0.52), (0.12, 0.5)]
+        return [(0.5, 0.95), (0.5, 0.85), (0.5, 0.75), (0.48, 0.65), (0.4, 0.57), (0.28, 0.52), (0.14, 0.5)]
     if turn == "right":
-        return [(0.5, 0.95), (0.5, 0.62), (0.58, 0.52), (0.88, 0.5)]
-    return [(0.5, 0.95), (0.5, 0.45)]
+        return [(0.5, 0.95), (0.5, 0.85), (0.5, 0.75), (0.52, 0.65), (0.6, 0.57), (0.72, 0.52), (0.86, 0.5)]
+    return [(0.5, 0.95), (0.5, 0.82), (0.5, 0.69), (0.5, 0.56), (0.5, 0.45)]
 
 
-def catmull_rom(points: list[Point], samples_per_segment: int = 16) -> list[Point]:
-    """制御点を通る滑らかな曲線を折れ線に展開する。"""
-    if len(points) < 3:
-        return list(points)
-    pts = [points[0], *points, points[-1]]
-    out: list[Point] = []
-    for i in range(1, len(pts) - 2):
-        p0, p1, p2, p3 = pts[i - 1], pts[i], pts[i + 1], pts[i + 2]
-        for k in range(samples_per_segment):
-            t = k / samples_per_segment
-            t2, t3 = t * t, t * t * t
-            x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
-            y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
-            out.append((x, y))
-    out.append(points[-1])
+def _dedupe(pts: list[Point], min_dist: float) -> list[Point]:
+    """近すぎる点（矢じりの向きが乱れる原因）を間引く。"""
+    out: list[Point] = [pts[0]]
+    for p in pts[1:]:
+        if math.hypot(p[0] - out[-1][0], p[1] - out[-1][1]) >= min_dist:
+            out.append(p)
+    if len(out) < 2 and len(pts) >= 2:
+        out = [pts[0], pts[-1]]
     return out
 
 
@@ -47,30 +40,27 @@ def _arrowhead(tip: Point, tail: Point, size: float) -> list[Point]:
 
 
 def draw_arrow(image: bytes, path: list[Point], turn: str) -> bytes:
-    """path は 0〜1 の正規化座標。JPEG バイト列を受け取り、矢印入りの JPEG を返す。"""
+    """path は 0〜1 の正規化座標の点列。点を直線で結び、終点に矢じりを付けた JPEG を返す。"""
     img = Image.open(BytesIO(image)).convert("RGB")
     w, h = img.size
-    pts = [(x * w, y * h) for x, y in (path if len(path) >= 2 else default_path(turn))]
-    curve = catmull_rom(pts)
+    norm = path if len(path) >= 2 else default_path(turn)
+    pts = _dedupe([(x * w, y * h) for x, y in norm], min_dist=w * 0.02)
     color = COLORS.get(turn, COLORS["straight"])
-    width = max(6, int(w * 0.028))
-    head = width * 2.6
+    width = max(6, int(w * 0.024))
+    head = width * 2.4
 
-    # 矢じりの分だけ線を手前で止める
-    tip, prev = curve[-1], curve[-2]
+    # 矢じりの分だけ最後の線分を手前で止める
+    tip, prev = pts[-1], pts[-2]
     seg = math.hypot(tip[0] - prev[0], tip[1] - prev[1]) or 1.0
     stop = (tip[0] - (tip[0] - prev[0]) / seg * head * 0.7, tip[1] - (tip[1] - prev[1]) / seg * head * 0.7)
-    line = curve[:-1] + [stop]
+    line = pts[:-1] + [stop]
 
     draw = ImageDraw.Draw(img)
-    for stroke, c in ((width + 6, OUTLINE), (width, color)):
-        draw.line(line, fill=c, width=stroke, joint="curve")
-        for p in (line[0], line[-1]):
-            draw.ellipse([p[0] - stroke / 2, p[1] - stroke / 2, p[0] + stroke / 2, p[1] + stroke / 2], fill=c)
-    tri = _arrowhead(tip, prev, head)
-    draw.polygon(tri, fill=OUTLINE, outline=OUTLINE, width=3)
-    inner = _arrowhead(tip, prev, head - 4)
-    draw.polygon(inner, fill=color)
+    draw.line(line, fill=color, width=width, joint="curve")
+    r = width / 2
+    for p in line:  # 折れ目と端を丸める
+        draw.ellipse([p[0] - r, p[1] - r, p[0] + r, p[1] + r], fill=color)
+    draw.polygon(_arrowhead(tip, prev, head), fill=color)
 
     buf = BytesIO()
     img.save(buf, format="JPEG", quality=90)

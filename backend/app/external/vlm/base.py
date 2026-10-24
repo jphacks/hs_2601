@@ -14,10 +14,10 @@ class VlmError(RuntimeError):
 @dataclass(frozen=True)
 class CandidateEvaluation:
     index: int
-    landmark: int  # 1〜5
-    turn: int  # 1〜5
-    arrow: int  # 1〜5 矢印の描きやすさ
-    view: int  # 1〜5（現在は未使用。互換のため残す）
+    on_walkway: bool  # 撮影地点に歩行者が立てるか
+    path_blocked: bool  # 進む先の路面へ歩いて行けない（柵・段差・水面）
+    here: int  # 1〜5 現在地のわかりやすさ
+    arrow: int  # 1〜5 矢印の引きやすさ
     landmark_text: str
     reason: str
     arrow_path: list[tuple[float, float]]  # 0〜1 の正規化座標
@@ -59,10 +59,10 @@ def parse_evaluation(text: str, n_images: int) -> Evaluation:
             path.append((min(1.0, max(0.0, x)), min(1.0, max(0.0, y))))
         evals.append(CandidateEvaluation(
             index=idx,
-            landmark=max(1, min(5, int(item.get("landmark_score", 1)))),
-            turn=max(1, min(5, int(item.get("turn_score", 1)))),
-            arrow=max(1, min(5, int(item.get("arrow_score", 3)))),
-            view=max(1, min(5, int(item.get("view_score", 3)))),
+            on_walkway=_as_bool(item.get("on_walkway", True)),
+            path_blocked=_as_bool(item.get("path_blocked", False)),
+            here=max(1, min(5, int(item.get("here_score", 1)))),
+            arrow=max(1, min(5, int(item.get("arrow_score", 1)))),
             landmark_text=str(item.get("landmark", "")).strip(),
             reason=str(item.get("reason", "")).strip(),
             arrow_path=path,
@@ -70,6 +70,14 @@ def parse_evaluation(text: str, n_images: int) -> Evaluation:
     if not evals:
         raise VlmError(f"VLM の返答に評価が含まれていません: {text[:200]}")
     best = int(body.get("best_index", -1))
-    if not 0 <= best < n_images:
-        best = max(evals, key=lambda e: (e.landmark + e.turn + e.arrow, e.arrow, e.turn)).index
+    walkable = [e for e in evals if e.on_walkway and not e.path_blocked] or evals  # 使える候補が無ければ全体から選ぶ
+    allowed = {e.index for e in walkable}
+    if best not in allowed:  # 範囲外、または立てない候補を選んでいたら選び直す
+        best = max(walkable, key=lambda e: (e.here + e.arrow, e.arrow)).index
     return Evaluation(evaluations=evals, best_index=best, raw_text=text)
+
+
+def _as_bool(v: object) -> bool:
+    if isinstance(v, bool):
+        return v
+    return str(v).strip().lower() in ("true", "1", "yes")

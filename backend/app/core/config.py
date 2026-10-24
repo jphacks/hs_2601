@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None  # Google AI Studio のキー（Maps のキーとは別物）
     anthropic_api_key: str | None = None
     vlm_provider: str = "gemini"  # "gemini" | "claude"
-    vlm_model: str = "gemini-3.5-flash-lite"  # claude なら "claude-haiku-4-5" など
+    vlm_model: str = "gemini-3.5-flash"  # claude なら "claude-haiku-4-5" など
     vlm_min_interval_s: float = 4.0  # 無料枠の 1 分あたり上限を超えないための呼び出し間隔
 
     # 経路探索の出力先（scripts/explore_route.py の --out 既定値）

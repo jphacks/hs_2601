@@ -57,21 +57,26 @@ class StreetViewStats:
     skipped: list[int] = field(default_factory=list)
 
 
-def _position(p: ExplorationPoint, heading: float, back_m: float) -> tuple[float, float]:
-    """候補位置。通常は進入方向の手前に下がる。出発点は後ろが経路外なので前方に進む。"""
+def _position(p: ExplorationPoint, heading: float, back_m: float, along: str = "in") -> tuple[float, float]:
+    """候補位置。通常は進入方向の手前に下がる。出発点は後ろが経路外なので前方に進む。
+    along="out" なら曲がった先（退出方向）へ進む。"""
     if back_m <= 0:
         return (p.lat, p.lng)
+    if along == "out" and p.heading_out is not None:
+        return destination_point((p.lat, p.lng), p.heading_out, back_m)
     direction = heading if p.maneuver.upper() == "DEPART" else (heading + 180.0) % 360.0
     return destination_point((p.lat, p.lng), direction, back_m)
 
 
-def choose_pano(client: StreetViewClient, p: ExplorationPoint, heading: float, opt: StreetViewOptions) -> tuple[PanoMeta, float] | None:
+def choose_pano(
+    client: StreetViewClient, p: ExplorationPoint, heading: float, opt: StreetViewOptions, along: str = "in"
+) -> tuple[PanoMeta, float] | None:
     """候補位置を順に試し、(メタ情報, 使った offset) を返す。無ければ None。"""
     first: tuple[PanoMeta, float] | None = None
     seen: set[str] = set()
     for i in range(opt.search_tries):
         back = opt.offset_m + i * opt.search_step_m
-        lat, lng = _position(p, heading, back)
+        lat, lng = _position(p, heading, back, along)
         meta = client.metadata(lat, lng, radius_m=opt.radius_m)
         if meta is None or meta.pano_id in seen:
             continue
@@ -142,26 +147,30 @@ class Variant:
     heading_mode: HeadingMode
     offset_m: float = 0.0
     fov: int = 90
+    along: str = "in"  # "in" = 進入方向の手前へ下がる / "out" = 曲がった先の道路へ進む
 
 
 TARGET_CANDIDATES = 8
+MAX_PER_PANO = 3  # 同じ撮影地点（pano）から取る候補の上限。1 地点に枠を使い切らないため
 
 # 曲がり角用。重複を除いて TARGET_CANDIDATES 枚になるまで上から順に試す
 TURN_VARIANTS: tuple[Variant, ...] = (
-    Variant("bisector", 0.0),        # 直進方向と曲がる先の両方
-    Variant("approach", 0.0),        # 進入方向。正面の目印が大きい
-    Variant("departure", 0.0),       # 入る道が正面
-    Variant("bisector", 10.0),       # 10 m 手前から。交差点が前方に見える
-    Variant("approach", 10.0),
-    Variant("bisector", 0.0, 110),   # 広角。曲がる先が枠に入りやすい
+    Variant("bisector", 0.0),              # 直進方向と曲がる先の両方
+    Variant("approach", 0.0),              # 進入方向。正面の目印が大きい
+    Variant("bisector", 10.0),             # 10 m 手前から。交差点が前方に見える
+    Variant("departure", 10.0, along="out"),  # 曲がった先の道路に 10 m 入った位置から、入る道を正面に
+    Variant("departure", 0.0),             # 入る道が正面
     Variant("bisector", 20.0),
-    Variant("approach", 0.0, 110),
+    Variant("departure", 20.0, along="out"),
+    Variant("bisector", 0.0, 110),         # 広角。曲がる先が枠に入りやすい
+    Variant("approach", 10.0),
     Variant("bisector", 5.0),
-    Variant("departure", 10.0),
+    Variant("departure", 30.0, along="out"),
     Variant("approach", 20.0),
     Variant("bisector", 10.0, 110),
     Variant("bisector", 30.0),
     Variant("approach", 30.0),
+    Variant("departure", 40.0, along="out"),
 )
 
 # 出発点・目的地用。向きの違いが無いので、位置（出発点は前方、目的地は手前）と画角を変える
@@ -201,19 +210,21 @@ def fetch_point_candidates(
     approach = p.heading if p.heading is not None else 0.0
     cands: list[ImageCandidate] = []
     seen: set[tuple[str, float, int]] = set()
+    per_pano: dict[str, int] = {}
     for v in variants or variants_for(p):
         if len(cands) >= target:
             break
         opt = StreetViewOptions(**{**base.__dict__, "offset_m": v.offset_m, "heading_mode": v.heading_mode, "fov": v.fov})
         heading = camera_heading(p, v.heading_mode)
-        chosen = choose_pano(client, p, approach, opt)
+        chosen = choose_pano(client, p, approach, opt, v.along)
         if chosen is None:
             continue
         meta, back = chosen
         sig = (meta.pano_id, round(heading), v.fov)
-        if sig in seen:
+        if sig in seen or per_pano.get(meta.pano_id, 0) >= MAX_PER_PANO:
             continue
         seen.add(sig)
+        per_pano[meta.pano_id] = per_pano.get(meta.pano_id, 0) + 1
         key = cache_key("streetview", meta.pano_id, round(heading, 1), opt.fov, opt.pitch, opt.size)
         data = cache.get_bytes(key) if cache else None
         if data is None:
@@ -226,7 +237,7 @@ def fetch_point_candidates(
         cands.append(ImageCandidate(
             image=rel, heading_mode=v.heading_mode,
             street_view=StreetViewMeta(pano_id=meta.pano_id, date=meta.date, heading=heading, fov=opt.fov,
-                                       pitch=opt.pitch, copyright=meta.copyright, offset_m=back),
+                                       pitch=opt.pitch, copyright=meta.copyright, offset_m=back if v.along == "in" else -back),
         ))
     if not cands:
         return p.model_copy(update={"image": None, "image_source": None, "street_view": None, "candidates": []})

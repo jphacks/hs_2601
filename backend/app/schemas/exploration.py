@@ -37,13 +37,13 @@ class ArrowPoint(BaseModel):
 
 
 class VlmScore(BaseModel):
-    landmark: int = Field(ge=1, le=5)  # 目印のわかりやすさ
-    turn: int = Field(ge=1, le=5)  # どこで曲がるかのわかりやすさ
-    arrow: int = Field(default=3, ge=1, le=5)  # 矢印の描きやすさ・わかりやすさ（曲がる先の路面が見えているか）
-    view: int = Field(default=3, ge=1, le=5)  # 人の視点に近いか（現在は評価軸から外している）
+    on_walkway: bool = True  # 撮影地点に歩行者が立てるか。False（船上・階段・店内など）は採用しない
+    path_blocked: bool = False  # 足元と進む先の路面の間に柵・段差・水面などがあり歩いて行けない。True は採用しない
+    here: int = Field(ge=1, le=5)  # 現在地のわかりやすさ（今ここにいると確信できるか、目印を含む）
+    arrow: int = Field(ge=1, le=5)  # 矢印の引きやすさ（どこを曲がるのかがはっきり見えるか）
     landmark_text: str = ""  # この画像での目印の短い説明
     reason: str = ""
-    arrow_path: list[ArrowPoint] = Field(default_factory=list)  # 歩行者の足元から曲がる先の路面までの経路（3〜6 点）
+    arrow_path: list[ArrowPoint] = Field(default_factory=list)  # 現在地 → 今の道 → 通りたい道 に沿った等間隔の点列（6〜12 点）
 
 
 class ImageCandidate(BaseModel):

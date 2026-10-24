@@ -12,7 +12,7 @@ def make_vlm_client(settings: Settings) -> VlmClient:
     if provider == "gemini":
         if not settings.gemini_api_key:
             raise VlmError("GEMINI_API_KEY が未設定です。backend/.env に書いてください（Google AI Studio で発行）。")
-        model = settings.vlm_model or "gemini-3.5-flash-lite"
+        model = settings.vlm_model or "gemini-3.5-flash"
         return GeminiClient(settings.gemini_api_key, model=model, min_interval_s=settings.vlm_min_interval_s)
     if provider == "claude":
         if not settings.anthropic_api_key:

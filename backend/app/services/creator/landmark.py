@@ -36,10 +36,18 @@ def fallback_text(p: ExplorationPoint) -> str:
     return f"{base}（次まで {p.distance_to_next_m} m）"
 
 
+def pano_groups(p: ExplorationPoint) -> str:
+    """同じ撮影地点（pano_id）の候補番号をまとめた説明文。例: 「画像 0,1,2,5,7 / 画像 3,4 / 画像 6」"""
+    groups: dict[str, list[int]] = {}
+    for i, c in enumerate(p.candidates):
+        groups.setdefault(c.street_view.pano_id, []).append(i)
+    return " / ".join("画像 " + ",".join(map(str, idx)) for idx in groups.values()) or "なし"
+
+
 def build_prompt(p: ExplorationPoint, n: int, template: str | None = None) -> str:
     tpl = template or PROMPT_PATH.read_text(encoding="utf-8")
     return tpl.format(n=n, turn_label=TURN_LABEL[p.turn], instruction=p.instruction or "（案内文なし）",
-                      distance_m=p.distance_to_next_m)
+                      distance_m=p.distance_to_next_m, groups=pano_groups(p))
 
 
 def _evaluate_point(client: VlmClient, p: ExplorationPoint, out_dir: Path, cache: FileCache | None) -> Evaluation | None:
@@ -57,18 +65,36 @@ def _evaluate_point(client: VlmClient, p: ExplorationPoint, out_dir: Path, cache
     return ev
 
 
+def choose_best(cands: list, model_best: int) -> int:
+    """立てる候補の中から選ぶ。モデルの選択が立てる候補ならそれを尊重し、そうでなければ点数で選び直す。"""
+    scored = [(i, c.score) for i, c in enumerate(cands) if c.score is not None]
+    walkable = [(i, sc) for i, sc in scored if sc.on_walkway] or scored
+    if any(i == model_best for i, _ in walkable):
+        return model_best
+    return max(walkable, key=lambda t: (t[1].here + t[1].arrow, t[1].arrow))[0]
+
+
 def apply_evaluation(p: ExplorationPoint, ev: Evaluation) -> ExplorationPoint:
     by_index = {e.index: e for e in ev.evaluations}
+    # 「立てるか」「進めるか」は向きではなく撮影地点の性質。同じパノラマの候補が 1 枚でも該当すれば全部除外する
+    bad_panos = {
+        p.candidates[e.index].street_view.pano_id
+        for e in ev.evaluations if (not e.on_walkway or e.path_blocked) and e.index < len(p.candidates)
+    }
     cands = [
-        c.model_copy(update={"score": VlmScore(landmark=e.landmark, turn=e.turn, arrow=e.arrow, view=e.view, landmark_text=e.landmark_text,
-                                  reason=e.reason, arrow_path=[ArrowPoint(x=x, y=y) for x, y in e.arrow_path])})
+        c.model_copy(update={"score": VlmScore(
+            on_walkway=e.on_walkway and c.street_view.pano_id not in bad_panos,
+            path_blocked=e.path_blocked or c.street_view.pano_id in bad_panos,
+            here=e.here, arrow=e.arrow, landmark_text=e.landmark_text, reason=e.reason,
+            arrow_path=[ArrowPoint(x=x, y=y) for x, y in e.arrow_path])})
         if (e := by_index.get(i)) else c
         for i, c in enumerate(p.candidates)
     ]
-    best = cands[ev.best_index]
+    best_index = choose_best(cands, ev.best_index)
+    best = cands[best_index]
     text = best.score.landmark_text if best.score and best.score.landmark_text and best.score.landmark_text != "目印なし" else None
     return p.model_copy(update={
-        "candidates": cands, "chosen_candidate": ev.best_index,
+        "candidates": cands, "chosen_candidate": best_index,
         "image": best.image, "street_view": best.street_view,
         "landmark": text or fallback_text(p),
     })

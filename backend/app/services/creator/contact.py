@@ -27,10 +27,15 @@ def render_contact_html(e: Exploration, title: str) -> str:
             for i, c in enumerate(p.candidates):
                 chosen = " chosen" if p.chosen_candidate == i else ""
                 sc = c.score
-                label = f"目印 {sc.landmark} / 曲 {sc.turn} / 矢印 {sc.arrow}" if sc else "未評価"
+                if sc and (not sc.on_walkway or sc.path_blocked):
+                    chosen += " rejected"
+                    why = "立てない" if not sc.on_walkway else "進めない"
+                    label = f"{why} / 現在地 {sc.here} / 矢印 {sc.arrow}"
+                else:
+                    label = f"現在地 {sc.here} / 矢印 {sc.arrow}" if sc else "未評価"
                 items.append(
                     f'<figure class="cand{chosen}"><img src="{html.escape(c.image)}" alt="">'
-                    f'<figcaption>#{i} {html.escape(c.heading_mode)} {c.street_view.offset_m:.0f}m fov{c.street_view.fov}<br>{label}</figcaption></figure>'
+                    f'<figcaption>#{i} {html.escape(c.heading_mode)} {("先" if c.street_view.offset_m < 0 else "手前")}{abs(c.street_view.offset_m):.0f}m fov{c.street_view.fov}<br>{label}</figcaption></figure>'
                 )
             cand_html = f'<div class="cands">{"".join(items)}</div>'
         cards.append(
@@ -64,6 +69,8 @@ def render_contact_html(e: Exploration, title: str) -> str:
   .cands {{ display: flex; flex-wrap: wrap; gap: .4rem; padding: .5rem .75rem .75rem; }}
   .cand {{ margin: 0; flex: 0 0 96px; border: 3px solid transparent; border-radius: 6px; }}
   .cand.chosen {{ border-color: #1a73e8; }}
+  .cand.rejected img {{ opacity: .35; }}
+  .cand.rejected figcaption {{ color: #c00; }}
   .cand img {{ width: 96px; height: 96px; object-fit: cover; border-radius: 3px; }}
   .cand figcaption {{ font-size: .65rem; color: #666; line-height: 1.2; }}
 </style></head>

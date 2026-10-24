@@ -15,8 +15,8 @@ FIXTURE = Path(__file__).parent / "fixtures" / "route_sample.json"
 JPEG = b"\xff\xd8\xff\xe0fake"
 
 GOOD = {"evaluations": [
-    {"index": 0, "landmark_score": 2, "turn_score": 3, "arrow_score": 2, "landmark": "目印なし", "reason": "壁だけ", "arrow_path": []},
-    {"index": 1, "landmark_score": 5, "turn_score": 4, "arrow_score": 5, "landmark": "赤い看板のコンビニ", "reason": "看板が大きい",
+    {"index": 0, "on_walkway": True, "here_score": 2, "arrow_score": 2, "landmark": "目印なし", "reason": "壁だけ", "arrow_path": []},
+    {"index": 1, "on_walkway": True, "here_score": 5, "arrow_score": 5, "landmark": "赤い看板のコンビニ", "reason": "看板が大きい",
      "arrow_path": [{"x": 0.5, "y": 0.95}, {"x": 0.5, "y": 0.6}, {"x": 1.2, "y": 0.5}]},
 ], "best_index": 1}
 
@@ -104,7 +104,7 @@ def test_最良の候補が採用され目印文が入る(tmp_path: Path) -> Non
     assert p.chosen_candidate == 1
     assert p.image == "images/000_c1.jpg"
     assert p.landmark == "赤い看板のコンビニ"
-    assert p.candidates[0].score is not None and p.candidates[0].score.turn == 3 and p.candidates[0].score.arrow == 2
+    assert p.candidates[0].score is not None and p.candidates[0].score.here == 2 and p.candidates[0].score.arrow == 2
     best = p.candidates[1].score
     assert best is not None and [(a.x, a.y) for a in best.arrow_path] == [(0.5, 0.95), (0.5, 0.6), (1.0, 0.5)]  # 範囲外は丸める
     assert stats.evaluated == [0] and stats.fallback == [1]  # 候補の無い目的地はフォールバック
@@ -134,10 +134,74 @@ def test_fallback_text_とプロンプト() -> None:
     p = e.points[0].model_copy(update={"turn": "left", "instruction": "", "distance_to_next_m": 50})
     assert fallback_text(p) == "左折（次まで 50 m）"
     prompt = build_prompt(p, 3)
-    assert "3 枚" in prompt and "左折" in prompt and "best_index" in prompt and "arrow_path" in prompt
+    assert "3 枚" in prompt and "左折" in prompt and "best_index" in prompt and "here_score" in prompt and "等間隔" in prompt
+    assert "グループ: なし" in prompt  # 候補が無いときはグループなし
 
 
-def test_arrow_score_や経路が無くても解釈できる() -> None:
-    body = {"evaluations": [{"index": 0, "landmark_score": 4, "turn_score": 4, "landmark": "x", "reason": "y"}], "best_index": 0}
+def test_撮影地点グループがプロンプトに入る() -> None:
+    from app.services.creator.landmark import pano_groups
+    e = Exploration.model_validate_json(FIXTURE.read_text(encoding="utf-8"))
+    cands = [ImageCandidate(image=f"images/0_c{i}.jpg", heading_mode="bisector", street_view=StreetViewMeta(pano_id=pid, heading=0))
+             for i, pid in enumerate(["A", "A", "B", "A"])]
+    p = e.points[0].model_copy(update={"candidates": cands})
+    assert pano_groups(p) == "画像 0,1,3 / 画像 2"
+
+
+def test_経路が無くても解釈できる() -> None:
+    body = {"evaluations": [{"index": 0, "here_score": 4, "arrow_score": 4, "landmark": "x", "reason": "y"}], "best_index": 0}
     ev = parse_evaluation(json.dumps(body), 1).evaluations[0]
-    assert ev.arrow == 3 and ev.arrow_path == []
+    assert ev.here == 4 and ev.arrow_path == []
+
+
+def test_立てない候補は点数が高くても選ばない() -> None:
+    body = {"evaluations": [
+        {"index": 0, "on_walkway": False, "here_score": 5, "arrow_score": 5, "landmark": "船上", "reason": "川", "arrow_path": []},
+        {"index": 1, "on_walkway": True, "here_score": 3, "arrow_score": 3, "landmark": "歩道", "reason": "ok", "arrow_path": []},
+    ], "best_index": 0}  # モデルが船上を選んでも
+    ev = parse_evaluation(json.dumps(body), 2)
+    assert ev.best_index == 1
+    assert ev.evaluations[0].on_walkway is False
+
+
+def test_全部立てないならモデルの選択を尊重し_範囲外なら点数で選ぶ() -> None:
+    evals = [
+        {"index": 0, "on_walkway": False, "here_score": 2, "arrow_score": 2, "landmark": "", "reason": "", "arrow_path": []},
+        {"index": 1, "on_walkway": "false", "here_score": 4, "arrow_score": 4, "landmark": "", "reason": "", "arrow_path": []},
+    ]
+    assert parse_evaluation(json.dumps({"evaluations": evals, "best_index": 0}), 2).best_index == 0
+    assert parse_evaluation(json.dumps({"evaluations": evals, "best_index": 9}), 2).best_index == 1
+
+
+def test_同じパノラマの候補が1枚でも立てないなら全部除外(tmp_path: Path) -> None:
+    e = Exploration.model_validate_json(FIXTURE.read_text(encoding="utf-8"))
+    (tmp_path / "images").mkdir()
+    cands = []
+    for i, pano in enumerate(["P_STAIRS", "P_STAIRS", "P_PLAZA"]):
+        rel = f"images/000_c{i}.jpg"
+        (tmp_path / rel).write_bytes(JPEG + bytes([i]))
+        cands.append(ImageCandidate(image=rel, heading_mode="bisector", street_view=StreetViewMeta(pano_id=pano, heading=10.0)))
+    p0 = e.points[0].model_copy(update={"candidates": cands, "image": cands[0].image, "turn": "left"})
+    body = {"evaluations": [
+        {"index": 0, "on_walkway": False, "here_score": 5, "arrow_score": 5, "landmark": "柵の内側", "reason": "", "arrow_path": []},
+        {"index": 1, "on_walkway": True, "here_score": 5, "arrow_score": 5, "landmark": "広場", "reason": "", "arrow_path": []},
+        {"index": 2, "on_walkway": True, "here_score": 3, "arrow_score": 3, "landmark": "歩道", "reason": "", "arrow_path": []},
+    ], "best_index": 1}
+
+    class Vlm:
+        model = "fake"
+        def evaluate(self, prompt, images):
+            return parse_evaluation(json.dumps(body), len(images))
+
+    e2, _ = evaluate_landmarks(Vlm(), e.model_copy(update={"points": [p0]}), tmp_path)
+    p = e2.points[0]
+    assert p.chosen_candidate == 2  # 同じ階段パノラマの c1 は点数が高くても除外
+    assert p.candidates[1].score is not None and p.candidates[1].score.on_walkway is False
+
+
+def test_進めない候補は除外される() -> None:
+    body = {"evaluations": [
+        {"index": 0, "on_walkway": True, "path_blocked": True, "here_score": 5, "arrow_score": 5, "landmark": "柵", "reason": "", "arrow_path": []},
+        {"index": 1, "on_walkway": True, "path_blocked": False, "here_score": 3, "arrow_score": 3, "landmark": "歩道", "reason": "", "arrow_path": []},
+    ], "best_index": 0}
+    ev = parse_evaluation(json.dumps(body), 2)
+    assert ev.best_index == 1 and ev.evaluations[0].path_blocked is True

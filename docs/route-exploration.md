@@ -164,17 +164,20 @@ out/
 ### 候補（ステップ 5）
 1 地点 **8 枚** を目標に、次の順で試し、同じパノラマ・同じ向き・同じ画角の重複は捨てる。
 
-曲がり角: bisector/0 m → approach/0 m → departure/0 m → bisector/10 m → approach/10 m → bisector/0 m/fov110 → bisector/20 m → approach/0 m/fov110 → bisector/5 m → departure/10 m → approach/20 m → bisector/10 m/fov110 → bisector/30 m → approach/30 m
+曲がり角: bisector/0 m → approach/0 m → bisector/10 m 手前 → departure/10 m 先（曲がった先の道路に入った位置）→ departure/0 m → bisector/20 m 手前 → departure/20 m 先 → bisector/0 m/fov110 → …（手前 30 m、先 40 m まで）
+
+同じ撮影地点（pano）からは **3 枚まで**。1 つの地点に枠を使い切ると、その地点が使えないと判定されたときに候補が残らないため。
 
 出発点・目的地（向きの違いが無い）: 位置を 0〜80 m の範囲でずらし（出発点は前方、目的地は手前）、fov 110 も混ぜる。
 
 ### 採点（ステップ 7）
 - 1 地点につき VLM を 1 回呼び、全候補を一度に渡す（画像 N 枚 + プロンプト）。
-- 返答は JSON 固定: 候補ごとの `landmark_score`（目印のわかりやすさ 1〜5）、`turn_score`（どこで曲がるかのわかりやすさ 1〜5）、`arrow_score`（**矢印の描きやすさ・わかりやすさ** 1〜5。足元から曲がる先の路面まで道路が途切れず見えているか）、`landmark`（20 字以内の目印文）、`reason`、`arrow_path`（画像内の矢印経路。左上 (0,0)〜右下 (1,1) の 3〜6 点）、全体の `best_index`。
-- 3 つの合計が高いものを優先し、同点なら `arrow_score`、次に `turn_score` を優先する。「人の視点に近いか」は評価軸から外した（`view_score` は互換のため残るが未使用）。
+- プロンプトには同じ撮影地点の画像グループ（例「画像 0,1,4 / 画像 2,7」）を渡す。立てるか・進めるかは向きではなく撮影地点の性質なので、グループ内の 1 枚でも該当すればその撮影地点の候補を全部除外する。
+- 返答は JSON 固定: 候補ごとの `on_walkway`（**撮影地点に歩行者が立てるか**。船上・水上・階段の途中・柵の内側・店内・車道中央は false）、`path_blocked`（**足元と進む先の路面の間に柵・手すり・段差・水面があり歩いて行けないか**。true は採用しない）、`here_score`（**現在地のわかりやすさ** 1〜5。今ここにいると確信できるか、目印を含む）、`arrow_score`（**矢印の引きやすさ** 1〜5。どこを曲がるのかがはっきり見えるか）、`landmark`（20 字以内の目印文）、`reason`、`arrow_path`（**現在地 → 今の道 → 通りたい道** の路面中心線に沿って等間隔に打った 6〜12 点。左上 (0,0)〜右下 (1,1)）、全体の `best_index`。
+- 2 つの合計が高いものを優先し、同点なら `arrow_score` を優先する。
 
 ### 矢印（ステップ 8）
-- 採用候補の `arrow_path` を Catmull-Rom 曲線でつなぎ、白縁 + turn 色（左 橙 / 右 紫 / 直進 青 / 到着 赤）の線と矢じりを描く。
+- 採用候補の `arrow_path` の点を **直線で順につなぎ**、turn 色の単色（左 橙 / 右 紫 / 直進 青 / 到着 赤）の線と矢じりを描く。縁取りなし、折れ目は丸める。
 - 左折なのに終点が左側（x ≤ 0.3）に無い、右折なのに右側（x ≥ 0.7）に無い場合は、終点をその側へ寄せて必ず曲線にする。
 - `arrow_path` が無い（VLM 不可）地点は turn ごとの既定形（足元から奥へ、左右は横へ抜ける）。
 - プロンプトは `backend/app/external/vlm/prompts/evaluate.txt`。
@@ -182,5 +185,5 @@ out/
 - VLM が使えない・失敗した・候補が無い地点は、Routes API の案内文と距離からのフォールバック文にする。
 
 ### VLM の選択
-- 既定は **Gemini 2.5 Flash-Lite**（Google AI Studio の無料枠、課金登録不要）。`.env` の `VLM_PROVIDER=claude` で Claude Haiku に切り替え可能。
-- 無料枠の 1 分あたり上限を避けるため、呼び出し間隔を `VLM_MIN_INTERVAL_S`（既定 4 秒）空け、429 は待って再試行する。
+- 既定は **Gemini 3.5 Flash**（Google AI Studio の無料枠、課金登録不要）。Flash-Lite は「階段の踊り場」「柵の内側」のような立てない地点の判定を誤ることがあり、Flash なら正しく除外できた。`.env` の `VLM_PROVIDER=claude` で Claude Haiku に切り替え可能。
+- 無料枠の 1 分あたり上限を避けるため、呼び出し間隔を `VLM_MIN_INTERVAL_S`（既定 4 秒）空け、429（上限）と 503（混雑）は待って再試行する。

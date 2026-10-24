@@ -48,8 +48,9 @@ def main() -> None:
     for p in e2.points:
         chosen = f"候補#{p.chosen_candidate}" if p.chosen_candidate is not None else "候補なし"
         sc = p.candidates[p.chosen_candidate].score if p.chosen_candidate is not None else None
-        score = f"目印{sc.landmark}/曲{sc.turn}/矢印{sc.arrow}" if sc else "-"
-        print(f"  {p.index:2d} {TURN_LABEL[p.turn]:<6} {chosen:<8} {score:<14} {p.landmark}")
+        score = f"現在地{sc.here}/矢印{sc.arrow}" if sc else "-"
+        rejected = sum(1 for c in p.candidates if c.score and (not c.score.on_walkway or c.score.path_blocked))
+        print(f"  {p.index:2d} {TURN_LABEL[p.turn]:<6} {chosen:<8} {score:<14} 除外{rejected}枚  {p.landmark}")
     for i, msg in stats.errors.items():
         print(f"  ! 地点 {i}: {msg}")
     print(f"\n一覧: {d / 'contact.html'}")

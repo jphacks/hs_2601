@@ -177,3 +177,19 @@ def test_候補は最大8枚_出発点と目的地は位置違いで複数(tmp_p
     e2, _ = fetch_candidates(client, e, tmp_path)
     assert [len(p.candidates) for p in e2.points] == [8, 8]
     assert {c.image for c in e2.points[0].candidates} == {f"images/000_c{i}.jpg" for i in range(8)}
+
+
+def test_同じパノラマからは3枚まで(tmp_path: Path) -> None:
+    from app.services.creator.streetview import fetch_candidates
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/metadata"):  # どこで聞いても同じパノラマ
+            return httpx.Response(200, json={"status": "OK", "pano_id": "SAME", "copyright": "© 2026 Google",
+                                             "location": {"lat": 34.7, "lng": 135.5}})
+        return httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
+
+    client = StreetViewClient("k", http=httpx.Client(transport=httpx.MockTransport(handler)))
+    e = load()
+    turn_pt = e.points[0].model_copy(update={"maneuver": "TURN_RIGHT", "heading_out": 170.0})
+    e2, _ = fetch_candidates(client, e.model_copy(update={"points": [turn_pt]}), tmp_path)
+    assert len(e2.points[0].candidates) == 3

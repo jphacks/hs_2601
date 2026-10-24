@@ -23,8 +23,9 @@ RESPONSE_SCHEMA = {
                 "type": "OBJECT",
                 "properties": {
                     "index": {"type": "INTEGER"},
-                    "landmark_score": {"type": "INTEGER"},
-                    "turn_score": {"type": "INTEGER"},
+                    "on_walkway": {"type": "BOOLEAN"},
+                    "path_blocked": {"type": "BOOLEAN"},
+                    "here_score": {"type": "INTEGER"},
                     "arrow_score": {"type": "INTEGER"},
                     "landmark": {"type": "STRING"},
                     "reason": {"type": "STRING"},
@@ -34,7 +35,7 @@ RESPONSE_SCHEMA = {
                                   "required": ["x", "y"]},
                     },
                 },
-                "required": ["index", "landmark_score", "turn_score", "arrow_score", "landmark", "reason", "arrow_path"],
+                "required": ["index", "on_walkway", "path_blocked", "here_score", "arrow_score", "landmark", "reason", "arrow_path"],
             },
         },
         "best_index": {"type": "INTEGER"},
@@ -72,8 +73,8 @@ class GeminiClient:
                 time.sleep(wait)
             res = self._http.post(url, params={"key": self._api_key}, json=body)
             self._last_call = time.monotonic()
-            if res.status_code == 429 and attempt < self._max_retries:
-                time.sleep(2.0 * (attempt + 1) ** 2)  # 2, 8, 18 秒
+            if res.status_code in (429, 503) and attempt < self._max_retries:  # レート制限・混雑は待って再試行
+                time.sleep(3.0 * (attempt + 1) ** 2)  # 3, 12, 27 秒
                 continue
             if res.status_code != 200:
                 raise VlmError(f"Gemini API failed: HTTP {res.status_code} {res.text[:300]}")

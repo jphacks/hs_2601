@@ -202,7 +202,7 @@ explorer.exe out/map.html         # 地図
 
 ### ステップ 7: VLM による採点と目印文（Gemini / Claude）
 
-候補画像を VLM に渡し、「目印のわかりやすさ」「どこで曲がるかのわかりやすさ」「矢印の描きやすさ」を 1〜5 で採点させて最良の 1 枚を採用し、目印の短い文章を `landmark` に、矢印の経路（画像内座標）を `candidates[].score.arrow_path` に入れる。
+候補画像を VLM に渡し、まず「撮影地点に歩行者が立てるか」「進む先の路面へ歩いて行けるか（柵・階段・水面で遮られていないか）」で船上・店内・階段の踊り場などを除外し、残りを「現在地のわかりやすさ」「矢印の引きやすさ（どこを曲がるのかがはっきり見えるか）」で 1〜5 採点して最良の 1 枚を採用し、目印の短い文章を `landmark` に、矢印用の点列（現在地 → 今の道 → 通りたい道 に沿って等間隔、画像内座標）を `candidates[].score.arrow_path` に入れる。
 
 ```bash
 # .env に GEMINI_API_KEY（Google AI Studio、無料枠）を書いておく
@@ -213,8 +213,8 @@ python -m scripts.landmark --from-route ./out/cases/4 --no-vlm     # VLM を使�
 出力: `route.json`（`candidates[].score`、`chosen_candidate`、`image`、`landmark` が埋まる）、`contact.html`（各候補の点数つき。採用した候補は青枠）。
 
 - 1 地点につき VLM を 1 回呼び、全候補を一度に渡す。結果は画像のハッシュ + プロンプト + モデル名でキャッシュする。
-- 既定は Gemini（`VLM_PROVIDER=gemini`、`VLM_MODEL=gemini-3.5-flash-lite`）。Claude にするには `VLM_PROVIDER=claude` と `ANTHROPIC_API_KEY`。
-- 無料枠の 1 分あたり上限を避けるため、呼び出し間隔を `VLM_MIN_INTERVAL_S`（既定 4 秒）空ける。429 は待って再試行する。
+- 既定は Gemini（`VLM_PROVIDER=gemini`、`VLM_MODEL=gemini-3.5-flash`）。Claude にするには `VLM_PROVIDER=claude` と `ANTHROPIC_API_KEY`。
+- 無料枠の 1 分あたり上限を避けるため、呼び出し間隔を `VLM_MIN_INTERVAL_S`（既定 4 秒）空ける。429 と 503 は待って再試行する。
 - VLM が失敗した地点や候補が無い地点は、案内文と距離からのフォールバック文になる（処理は止めない）。
 - プロンプト: `app/external/vlm/prompts/evaluate.txt`
 
@@ -222,13 +222,13 @@ python -m scripts.landmark --from-route ./out/cases/4 --no-vlm     # VLM を使�
 
 ### ステップ 8: 矢印の描画
 
-採用画像に、VLM が返した経路に沿って曲線の矢印を重ね、`arrow_image` に入れる。API 不要。
+採用画像に、VLM が打った点を直線で順につないだ矢印を重ね、`arrow_image` に入れる。API 不要。
 
 ```bash
 python -m scripts.arrow --from-route ./out/cases/4
 ```
 
-- 色: 左 橙 / 右 紫 / 直進 青 / 到着 赤。白縁つきで写真の上でも読める。
+- 色: 左 橙 / 右 紫 / 直進 青 / 到着 赤。単色で縁取りなし。
 - 左右折なのに経路が曲がっていなければ、終点をその側へ寄せて必ず曲線にする。
 - VLM の経路が無い地点は turn ごとの既定形で描く。
 - `contact.html` と `map.html` は矢印入り画像を優先して表示する。`scripts.explore_route` はここまで一括で実行する。
