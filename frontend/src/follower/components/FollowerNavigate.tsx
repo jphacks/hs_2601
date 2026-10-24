@@ -1,294 +1,325 @@
+
 import { useState } from 'react'
 
 interface Props {
   routeId: string | undefined
 }
 
-interface Step {
-  image: string
-  direction: 'straight' | 'left' | 'right' | 'arrive'
-  title: string
-  landmark: string
-  distance: number
-}
-
-const demoSteps: Step[] = [
+const demoSteps = [
   {
+    direction: '直進',
+    landmark: '駅の出口を出て、そのまま歩道を進みます。',
+    distance: 120,
+    arrow: '↑',
+    color: '#176B4D',
     image:
-      'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=1000',
-    direction: 'straight',
-    title: 'このまま直進',
-    landmark: '前方の大きな交差点を目指してください。',
-    distance: 150,
+      'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1000&q=80',
   },
   {
-    image:
-      'https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=1000',
-    direction: 'right',
-    title: '右に曲がる',
-    landmark: '交差点まで来たら、右に曲がってください。',
+    direction: '右に曲がる',
+    landmark: '横断歩道の先で右に曲がります。',
     distance: 80,
+    arrow: '↗',
+    color: '#176B4D',
+    image:
+      'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1000&q=80',
   },
   {
+    direction: '左に曲がる',
+    landmark: '大きな通りに出たら左に曲がります。',
+    distance: 60,
+    arrow: '↖',
+    color: '#176B4D',
     image:
-      'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=1000',
-    direction: 'left',
-    title: '左に曲がる',
-    landmark: '建物の入口を目印に、左に曲がってください。',
-    distance: 40,
+      'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?auto=format&fit=crop&w=1000&q=80',
   },
   {
+    direction: '直進',
+    landmark: '建物が見えたら、入口まで進みます。',
+    distance: 30,
+    arrow: '↑',
+    color: '#176B4D',
     image:
-      'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=1000',
-    direction: 'arrive',
-    title: '会場に到着！',
+      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1000&q=80',
+  },
+  {
+    direction: '到着！',
     landmark: '目的地に到着しました。お疲れさまでした！',
     distance: 0,
+    arrow: '✓',
+    color: '#176B4D',
+    image:
+      'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?auto=format&fit=crop&w=1000&q=80',
   },
 ]
-
-const arrows: Record<Step['direction'], string> = {
-  straight: '↑',
-  left: '←',
-  right: '→',
-  arrive: '✓',
-}
 
 export function FollowerNavigate({ routeId }: Props) {
   const [current, setCurrent] = useState(0)
   const step = demoSteps[current]
-
-  const isLast = current === demoSteps.length - 1
+  const arrived = current === demoSteps.length - 1
+  const progress = ((current + 1) / demoSteps.length) * 100
 
   return (
     <main
       style={{
         minHeight: '100vh',
-        background: '#f7f7f4',
-        color: '#292923',
-        padding: '24px 16px',
+        background: '#F5F5F0',
+        color: '#202820',
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        padding: '20px 16px 32px',
+        boxSizing: 'border-box',
       }}
     >
       <div style={{ maxWidth: 480, margin: '0 auto' }}>
-        <header
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 20,
-          }}
-        >
-          <div>
-            <p
-              style={{
-                color: '#047857',
-                fontWeight: 800,
-                letterSpacing: 2,
-                fontSize: 12,
-                margin: '0 0 6px',
-              }}
-            >
-              WAYFINDER
-            </p>
-            <h1 style={{ fontSize: 23, margin: 0 }}>
-              会場までの道案内
-            </h1>
-          </div>
-
-          <span
+        <header style={{ marginBottom: 24 }}>
+          <div
             style={{
-              background: '#fff',
-              borderRadius: 20,
-              padding: '8px 12px',
-              fontSize: 14,
-              whiteSpace: 'nowrap',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            {current + 1} / {demoSteps.length}
-          </span>
+            <div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: 3,
+                  color: '#176B4D',
+                }}
+              >
+                WAYFINDER
+              </div>
+              <div style={{ fontSize: 12, color: '#73776F', marginTop: 4 }}>
+                写真でつなぐ道案内
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: 11,
+                padding: '6px 10px',
+                borderRadius: 20,
+                background: '#DDEFE3',
+                color: '#176B4D',
+                fontWeight: 700,
+              }}
+            >
+              DEMO
+            </span>
+          </div>
+
+          <h1 style={{ fontSize: 24, margin: '24px 0 6px' }}>
+            会場までの道案内
+          </h1>
+          <p style={{ fontSize: 14, color: '#73776F', margin: 0 }}>
+            出発地 → 目的地
+          </p>
+          <p style={{ fontSize: 11, color: '#73776F', marginTop: 6 }}>
+            案内ID：{routeId ?? 'demo'}
+          </p>
+
+          <div
+            style={{
+              height: 5,
+              background: '#E0E3DB',
+              borderRadius: 10,
+              marginTop: 18,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${progress}%`,
+                background: '#176B4D',
+                transition: 'width 0.2s',
+              }}
+            />
+          </div>
+          <p
+            style={{
+              fontSize: 12,
+              color: '#73776F',
+              textAlign: 'right',
+              margin: '7px 0 0',
+            }}
+          >
+            {arrived
+              ? 'すべての案内が完了しました'
+              : `${current + 1} / ${demoSteps.length} ステップ`}
+          </p>
         </header>
 
-        <div
+        <section
           style={{
-            height: 6,
-            background: '#e5e5df',
-            borderRadius: 10,
-            overflow: 'hidden',
-            marginBottom: 16,
+            background: '#FFFFFF',
+            borderRadius: 20,
+            padding: 12,
+            boxShadow: '0 4px 18px #17291A0D',
           }}
         >
           <div
             style={{
-              width: `${((current + 1) / demoSteps.length) * 100}%`,
-              height: '100%',
-              background: '#047857',
-              transition: 'width 0.2s',
+              position: 'relative',
+              borderRadius: 14,
+              overflow: 'hidden',
+              background: '#E5E7E0',
             }}
-          />
-        </div>
-
-        <section
-          style={{
-            background: '#fff',
-            border: '1px solid #e7e5e4',
-            borderRadius: 20,
-            overflow: 'hidden',
-          }}
-        >
-          <img
-            src={step.image}
-            alt={`目印の写真 ${current + 1}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              height: 260,
-              objectFit: 'cover',
-              background: '#e7e5e4',
-            }}
-          />
-
-          <div style={{ padding: 20 }}>
-            <div
+          >
+            <img
+              src={step.image}
+              alt="道の目印の参考写真"
               style={{
-                display: 'flex',
-                gap: 16,
-                alignItems: 'center',
-                marginBottom: 24,
+                display: 'block',
+                width: '100%',
+                height: 250,
+                objectFit: 'cover',
+              }}
+            />
+            <span
+              style={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                background: '#FFFFFFF0',
+                borderRadius: 8,
+                padding: '7px 10px',
+                fontSize: 12,
+                fontWeight: 700,
               }}
             >
-              <div
-                aria-label={step.title}
+              {arrived ? 'GOAL' : `目印 ${current + 1}`}
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              padding: '22px 8px',
+            }}
+          >
+            <div
+              style={{
+                width: 82,
+                height: 82,
+                flexShrink: 0,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderRadius: 20,
+                background: step.color,
+                color: '#FFFFFF',
+                fontSize: 48,
+                fontWeight: 700,
+              }}
+            >
+              {step.arrow}
+            </div>
+            <div>
+              <h2
                 style={{
-                  flexShrink: 0,
-                  width: 76,
-                  height: 76,
-                  borderRadius: 18,
-                  background: '#047857',
-                  color: '#fff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 48,
-                  fontWeight: 700,
+                  fontSize: 25,
+                  lineHeight: 1.3,
+                  margin: 0,
+                  color: step.color,
                 }}
               >
-                {arrows[step.direction]}
-              </div>
-
-              <div>
-                <p
-                  style={{
-                    margin: '0 0 6px',
-                    fontSize: 13,
-                    color: '#78786f',
-                  }}
-                >
-                  {step.direction === 'arrive' ? 'ゴール' : '次の行動'}
-                </p>
-
-                <h2 style={{ margin: 0, fontSize: 24 }}>
-                  {step.title}
-                </h2>
-
-                <p
-                  style={{
-                    margin: '8px 0 0',
-                    fontSize: 14,
-                    color: '#57574f',
-                  }}
-                >
-                  {step.distance > 0
-                    ? `次の目印まで約 ${step.distance} m`
-                    : '目的地です'}
-                </p>
-              </div>
-            </div>
-
-            <div
-              style={{
-                padding: 16,
-                background: '#f7f7f4',
-                borderRadius: 12,
-                marginBottom: 20,
-              }}
-            >
+                {step.direction}
+              </h2>
               <p
                 style={{
-                  margin: '0 0 8px',
-                  color: '#047857',
                   fontSize: 14,
-                  fontWeight: 700,
+                  lineHeight: 1.8,
+                  margin: '8px 0 0',
+                  color: '#50564F',
                 }}
               >
-                目印
-              </p>
-
-              <p style={{ margin: 0, lineHeight: 1.8 }}>
                 {step.landmark}
               </p>
             </div>
+          </div>
 
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() =>
-                  setCurrent((n) => Math.max(0, n - 1))
-                }
-                disabled={current === 0}
-                style={{
-                  flex: 1,
-                  padding: '15px 8px',
-                  borderRadius: 12,
-                  border: '1px solid #d6d3d1',
-                  background: '#fff',
-                  fontSize: 16,
-                  fontWeight: 600,
-                  cursor: current === 0 ? 'default' : 'pointer',
-                  opacity: current === 0 ? 0.4 : 1,
-                }}
-              >
-                ← 前へ
-              </button>
-
-              <button
-                onClick={() =>
-                  setCurrent((n) =>
-                    Math.min(demoSteps.length - 1, n + 1)
-                  )
-                }
-                disabled={isLast}
-                style={{
-                  flex: 2,
-                  padding: '15px 8px',
-                  borderRadius: 12,
-                  border: 'none',
-                  background: '#047857',
-                  color: '#fff',
-                  fontSize: 16,
-                  fontWeight: 700,
-                  cursor: isLast ? 'default' : 'pointer',
-                  opacity: isLast ? 0.4 : 1,
-                }}
-              >
-                次へ →
-              </button>
+          <div
+            style={{
+              borderTop: '1px solid #E9EBE5',
+              padding: '16px 8px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <div style={{ fontSize: 26 }}>🚶</div>
+            <div>
+              <div style={{ fontSize: 12, color: '#73776F' }}>
+                {arrived ? '目的地' : '次の目印まで'}
+              </div>
+              <div style={{ fontSize: 25, fontWeight: 800, marginTop: 3 }}>
+                {arrived ? '到着！' : `約 ${step.distance} m`}
+              </div>
             </div>
           </div>
         </section>
 
-        <p
+        <div
           style={{
-            marginTop: 16,
-            color: '#78786f',
-            fontSize: 12,
-            textAlign: 'center',
-            lineHeight: 1.8,
+            display: 'flex',
+            gap: 12,
+            marginTop: 18,
           }}
         >
-          案内 ID：{routeId ?? '未指定'}
-          <br />
-          写真と目印を確認し、安全に移動してください。
+          <button
+            onClick={() => setCurrent((n) => Math.max(0, n - 1))}
+            disabled={current === 0}
+            style={{
+              flex: 1,
+              padding: '16px 10px',
+              borderRadius: 14,
+              border: '1px solid #D9DDD4',
+              background: '#FFFFFF',
+              color: '#176B4D',
+              fontSize: 16,
+              fontWeight: 700,
+              opacity: current === 0 ? 0.4 : 1,
+              cursor: current === 0 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            ← 前へ
+          </button>
+          <button
+            onClick={() =>
+              setCurrent((n) => Math.min(demoSteps.length - 1, n + 1))
+            }
+            disabled={arrived}
+            style={{
+              flex: 1,
+              padding: '16px 10px',
+              borderRadius: 14,
+              border: 'none',
+              background: '#176B4D',
+              color: '#FFFFFF',
+              fontSize: 16,
+              fontWeight: 700,
+              opacity: arrived ? 0.5 : 1,
+              cursor: arrived ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {arrived ? '到着済み ✓' : '次へ →'}
+          </button>
+        </div>
+
+        <p
+          style={{
+            fontSize: 11,
+            lineHeight: 1.7,
+            textAlign: 'center',
+            color: '#858980',
+            marginTop: 18,
+          }}
+        >
+          ※ 現在は画面確認用のサンプルです。写真・距離・経路は実際の道順ではありません。
         </p>
       </div>
     </main>
