@@ -11,6 +11,7 @@ import polyline as polyline_codec
 
 from app.external.google.routes import LatLng, Route, RoutesClient, parse_routes_response
 from app.schemas.exploration import Place
+from app.services.creator.cache import FileCache, cache_key
 
 
 @dataclass(frozen=True)
@@ -19,13 +20,22 @@ class RouteOutput:
     raw: dict[str, Any]  # raw/routes.json に保存する
 
 
-def compute_route(client: RoutesClient, origin: Place, destination: Place, via: list[Place] | None = None) -> RouteOutput:
-    route = client.compute_walking_route(
-        LatLng(origin.lat, origin.lng),
-        LatLng(destination.lat, destination.lng),
-        [LatLng(p.lat, p.lng) for p in (via or [])],
-    )
-    return RouteOutput(route=route, raw=route.raw)
+def compute_route(
+    client: RoutesClient, origin: Place, destination: Place, via: list[Place] | None = None, cache: FileCache | None = None
+) -> RouteOutput:
+    """座標の組でキャッシュを引き、無ければ API を叩く。"""
+    pts = [(origin.lat, origin.lng), *((p.lat, p.lng) for p in (via or [])), (destination.lat, destination.lng)]
+    key = cache_key("routes", pts)
+    body = cache.get_json(key) if cache else None
+    if body is None:
+        body = client.compute_walking_route(
+            LatLng(origin.lat, origin.lng),
+            LatLng(destination.lat, destination.lng),
+            [LatLng(p.lat, p.lng) for p in (via or [])],
+        ).raw
+        if cache:
+            cache.set_json(key, body)
+    return RouteOutput(route=parse_routes_response(body), raw=body)
 
 
 def route_from_raw(raw: dict[str, Any]) -> RouteOutput:

@@ -74,21 +74,28 @@ out/
 | `index` | int | 0 始まりの連番 | turns |
 | `lat` / `lng` | float | 曲がり角の座標 | turns |
 | `heading` | float \| null | **交差点に近づく向き**（0〜360、北 = 0、時計回り）。参加者が見る向きに合わせる。出発点だけは出て行く向き | turns |
+| `heading_out` | float \| null | 交差点から出て行く向き。目的地は null | turns |
 | `maneuver` | string | Routes API の maneuver をそのまま（`TURN_LEFT`、`TURN_RIGHT`、`STRAIGHT`、`DEPART`、`ARRIVE` など） | turns |
 | `turn` | `"left"` \| `"right"` \| `"straight"` \| `"arrive"` | maneuver を 4 種に正規化したもの。矢印描画と参加者表示が使う | turns |
 | `instruction` | string | Routes API の案内文（日本語）。VLM が使えないときのフォールバック文に使う | turns |
 | `distance_to_next_m` | int | 次の要素までの距離（m）。最後の要素は 0 | turns |
-| `image` | string \| null | `out/` からの相対パス。Street View がない地点は null | streetview |
+| `image` | string \| null | 採用した画像の `out/` からの相対パス。Street View がない地点は null。候補があるときは `chosen_candidate` の画像 | streetview → landmark |
+| `candidates[]` | array | 向き・位置の違う候補画像（`image`、`heading_mode`、`street_view`、`score`）。ステップ 7 の採点が `score` に入る | streetview / landmark |
+| `chosen_candidate` | int \| null | VLM が選んだ候補の番号。未評価なら null（`image` は先頭候補の仮採用） | landmark |
 | `image_source` | `"street_view"` \| `"creator_photo"` \| null | 画像の出所。作成者の写真を差し込む段階で `creator_photo` が増える | streetview |
-| `street_view` | object \| null | 取得時のパラメータ（pano_id、撮影年月、heading、fov、pitch）。再取得やデバッグ用 | streetview |
-| `landmark` | string \| null | **後続の VLM ステップが埋める。** 探索段階では null | landmark |
+| `street_view` | object \| null | 取得時のパラメータ（pano_id、撮影年月、heading、fov、pitch、copyright、offset_m）。copyright に Google を含めば公式撮影 | streetview |
+| `landmark` | string \| null | VLM が選んだ画像での目印の短い説明。VLM 不可なら案内文と距離からのフォールバック文 | landmark |
 | `arrow_image` | string \| null | **後続の矢印描画ステップが埋める。** 矢印を重ねた画像の相対パス | arrow |
 
 ### 決めごと
 
 - `turn` の変換表: `TURN_LEFT` `TURN_SLIGHT_LEFT` `TURN_SHARP_LEFT` `UTURN_LEFT` → `left`、右も同様、`ARRIVE` → `arrive`、それ以外 → `straight`。
-- `heading` は経路ポリライン上で、その地点の 10 m 手前から地点を見た方位（近づく向き）。Street View 取得時の `heading` にもこれを渡し、曲がる方向は矢印で重ねる。
+- `heading` は経路ポリライン上で、その地点の 10 m 手前から地点を見た方位（近づく向き）。`heading_out` は地点から 10 m 先を見た方位。
+- Street View のカメラは既定で **両者の中間（bisector）** を向く。進入方向だけを向くと画角 90° では曲がる先の道が枠外になるため。曲がる方向は矢印で重ねる。
 - Street View は Metadata API で存在確認してから Static API を叩く。`status` が `OK` 以外なら `image` と `street_view` を null にする。
+- **Google 公式撮影のパノラマを優先する。** 最寄りがユーザー投稿なら 8 m ずつ手前に下がって最大 4 回探す（ユーザー投稿は夜景・屋内・船上が混ざる）。公式が無ければ最初の候補を使う。
+- 既知の限界: 公式撮影にも船上（道頓堀の川）やトレッカー撮影が含まれ、道路上とは限らない。
+- 既知の限界: 経路が建物内を通る区間（駅前ビルの通路など）では店舗内のパノラマが返る。撮影位置は経路から数 m なので距離では除外できない。屋内はスコープ外とし、必要になれば VLM に「屋内の画像か」を判定させてフォールバック文に回す。
 - 画像サイズは 640×640、`fov` 90、`pitch` 0 を既定値にする。
 - 後続ステップは `route.json` を読み、`landmark` と `arrow_image` を埋めて同じ場所に上書き保存する。1 つのファイルがパイプラインを流れる。
 - 写真列 JSON（フロントに渡す最終形）への変換は assemble ステップで行う。この中間形式を直接フロントに返さない。
@@ -104,9 +111,9 @@ out/
 | 2 | `external/google/geocoding.py` + `services/creator/geocode.py` + `services/creator/mapview.py` + `scripts/geocode.py` | `python -m scripts.geocode "大阪駅" "グランフロント大阪"` でピンが地図に出る（完了） | 1 |
 | 3 | `external/google/routes.py` + `services/creator/route.py` + `scripts/route.py` | `python -m scripts.route "大阪駅" "グランフロント大阪"` で経路線とステップのピンが地図に出る（完了） | 2 |
 | 4 | `services/creator/turns.py` + `geo.py` + `scripts/turns.py` | `python -m scripts.turns --from-raw ./out` で採用・不採用が色分けされた地図と `route.json` が出る（実装済み。しきい値は検証中） | 3 の fixture |
-| 5 | `external/google/street_view.py` + `services/creator/streetview.py` | 各 point に `images/NNN.jpg` が付く。ない地点は null になる | 4 |
-| 6 | `scripts/explore_route.py` | コマンド 1 発で `out/` 一式ができる | 2〜5 |
-| 7 | （後続）`services/creator/landmark.py` | `landmark` が埋まる | 6、VLM キー |
+| 5 | `external/google/street_view.py` + `services/creator/streetview.py` + `contact.py` + `scripts/streetview.py` | `python -m scripts.streetview --from-route DIR` で各地点に **候補画像が複数**（向き 3 種 × 位置 2 種、重複除去）並ぶ（完了） | 4 |
+| 6 | `scripts/explore_route.py` + `services/creator/cache.py` | コマンド 1 発で `out/` 一式ができる。同じ入力は `.cache/` を再利用。7 も組み込み済み（完了） | 2〜5、7 |
+| 7 | `external/vlm/`（Gemini / Claude）+ `services/creator/landmark.py` + `scripts/landmark.py` | VLM が候補ごとに「目印のわかりやすさ」「曲がる場所のわかりやすさ」を 1〜5 で採点し、最良の 1 枚を `image` に採用、`landmark` に目印文（完了。既定は Gemini 2.5 Flash-Lite の無料枠） | 5、VLM キー |
 | 8 | （後続）`services/creator/arrow.py` | `arrow_image` が埋まる | 6 |
 
 - 4 は API キーが届く前でも着手できる。3 で取った生レスポンスを `tests/fixtures/routes_sample.json` として置く。
@@ -149,3 +156,26 @@ out/
 - **公園内の疑わしい TURN**: maneuver は TURN なのに Δθ が ±5° 以内のケースがある（中之島公園）。geometry を優先して不採用にするか。
 - **NAME_CHANGE で案内文が「直進」**: Δθ が 35° でも案内文は「交差点を直進」。案内文を優先して straight にするか。
 - **目的地直前の近接点**: 左折から 12 m で到着、のような場合も両方残す。目的地の写真は「ここが入口」の最終確認になる。
+
+## 5. 画像の選定（ステップ 5 + 7）
+
+1 地点につき Street View を複数枚取り、VLM に採点させて 1 枚を選ぶ。
+
+### 候補（ステップ 5）
+1 地点 **5 枚** を目標に、次の順で試し、同じパノラマ・同じ向き・同じ画角の重複は捨てる。
+
+曲がり角: bisector/0 m → approach/0 m → departure/0 m → bisector/10 m → approach/10 m → bisector/0 m/fov110 → bisector/20 m → approach/0 m/fov110
+
+出発点・目的地（向きの違いが無い）: 位置を 0 / 10 / 20 / 30 / 40 / 50 m とずらし（出発点は前方、目的地は手前）、fov 110 も混ぜる。
+
+### 採点（ステップ 7）
+- 1 地点につき VLM を 1 回呼び、全候補を一度に渡す（画像 N 枚 + プロンプト）。
+- 返答は JSON 固定: 候補ごとの `landmark_score`（目印のわかりやすさ 1〜5）、`turn_score`（どこで曲がるかのわかりやすさ 1〜5）、`view_score`（**人の視点に近いか** 1〜5。歩道の目線・自然な画角なら高く、車道の高所・船上・屋内・極端な広角は低い）、`landmark`（20 字以内の目印文）、`reason`、全体の `best_index`。
+- 3 つの合計が高いものを優先し、同点なら `turn_score` を優先する。
+- プロンプトは `backend/app/external/vlm/prompts/evaluate.txt`。
+- 画像の SHA-256 + プロンプト + モデル名でキャッシュする。同じ候補に対する再実行は無料。
+- VLM が使えない・失敗した・候補が無い地点は、Routes API の案内文と距離からのフォールバック文にする。
+
+### VLM の選択
+- 既定は **Gemini 2.5 Flash-Lite**（Google AI Studio の無料枠、課金登録不要）。`.env` の `VLM_PROVIDER=claude` で Claude Haiku に切り替え可能。
+- 無料枠の 1 分あたり上限を避けるため、呼び出し間隔を `VLM_MIN_INTERVAL_S`（既定 4 秒）空け、429 は待って再試行する。

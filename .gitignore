@@ -26,3 +26,6 @@ Thumbs.db
 
 # 経路探索の出力
 backend/out/
+
+# 外部 API のキャッシュ
+backend/.cache/

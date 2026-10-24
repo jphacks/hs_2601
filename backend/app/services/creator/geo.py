@@ -64,3 +64,13 @@ def bearing_out_of(path: list[LatLngT], idx: int, window_m: float = 10.0) -> flo
 
 def nearest_vertex(path: list[LatLngT], p: LatLngT) -> int:
     return min(range(len(path)), key=lambda i: haversine_m(path[i], p))
+
+
+def destination_point(p: LatLngT, bearing: float, distance_m: float) -> LatLngT:
+    """p から bearing 方向へ distance_m 進んだ地点。"""
+    lat1, lng1 = map(math.radians, p)
+    br = math.radians(bearing)
+    d = distance_m / EARTH_RADIUS_M
+    lat2 = math.asin(math.sin(lat1) * math.cos(d) + math.cos(lat1) * math.sin(d) * math.cos(br))
+    lng2 = lng1 + math.atan2(math.sin(br) * math.sin(d) * math.cos(lat1), math.cos(d) - math.sin(lat1) * math.sin(lat2))
+    return (math.degrees(lat2), math.degrees(lng2))

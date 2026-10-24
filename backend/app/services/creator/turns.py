@@ -144,6 +144,7 @@ def extract_turns(route: Route, origin: Place, destination: Place, creator_photo
                 lat=c.lat,
                 lng=c.lng,
                 heading=heading,
+                heading_out=c.heading_out,
                 maneuver=c.maneuver,
                 turn=d.turn or "straight",
                 instruction=c.instruction,
