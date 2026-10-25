@@ -313,6 +313,30 @@ explorer.exe out/cases/5/qr.png
 - 書き込みは service_role キーだけ。フロントに渡さない。
 - SDK は使わず、`app/external/supabase/rest.py` が PostgREST と Storage の REST を httpx で叩く。
 
+### ステップ 12: 作成者の写真を通る経路（photos.json から）
+
+作る人が撮った写真列（画像 + 座標、撮った順）を入力にし、「出発地 → 写真 1 → … → 写真 n → 目的地」を通る経路を作る。
+入力の形は [docs/interface.md](../docs/interface.md) 4 章（`photos.json`、型は `app/schemas/creator_input.py`）。
+
+```bash
+# テスト用の写真を Street View で作る（作成者が曲がり角で撮った想定。写真の座標はパノラマの撮影位置）
+python -m scripts.fake_photos "四天王寺 南大門" "天王寺公園 てんしば" --n 3 --out ./out/cases/6 --name "写真つき→てんしば"
+python -m scripts.photos_map --input ./out/cases/6           # 写真順の地図（photos_map.html）で順序を目視
+
+# 写真を通る経路を作り、保存と QR まで（--publish は photos.json の命名で保存。--name で上書き可）
+python -m scripts.explore_route --photos ./out/cases/6 --out ./out/cases/6 --publish
+python -m scripts.show_plan --qr ./out/cases/6/qr.png
+```
+
+仕組み:
+
+- 区間（出発地→写真 1、写真 1→写真 2、…）ごとに既存の経路計算と曲がり角抽出を回し、区間の境界を写真地点 1 つに統合する（`app/services/creator/legs.py`）。
+  写真の順序は入力順で固定。曲がる方向は「前区間の到着方位 → 次区間の出発方位」の差で決める。
+- 写真地点は `image_source = "creator_photo"`。Street View 取得・VLM・矢印をすべて飛ばし、写真をそのまま使う。目印文は `caption` があればそれ。
+- 写真の座標は `creator_photo` に残し、経路上の点は道路に吸着した座標。吸着が `accuracy_m` の 3 倍を超えると警告（処理は止めない）。
+- 同じ場所の写真など経路が取れない区間は飛ばして警告に残し、その写真は前の写真に統合する。
+- 出力は通常と同じ構成に `photos/`、`photos.json`、`legs/NN.json`（区間ごとの生レスポンス）、`photos_map.html` が加わる。
+
 ## 構成
 
 ```
@@ -325,6 +349,7 @@ app/
 │   ├── follower.py      # 参加者向け: GET /api/public/routes/{id}（JSON）、GET /r/{id}（HTML、QR の飛び先）
 │   └── deps.py          # 依存関係（anon キーのリポジトリ）。テストで差し替える
 ├── schemas/
+│   ├── creator_input.py # 作成入力 photos.json（PlanInput、CreatorPhoto）
 │   ├── exploration.py   # 経路探索の中間形式 route.json（内部用）
 │   └── route_plan.py    # 参加者に渡す公開形式（route_plans.plan_json）
 ├── external/
@@ -352,6 +377,10 @@ app/
     │   ├── route.py     # ステップ 3: 徒歩経路、ポリライン復号
     │   ├── geo.py       # 方位・距離の純関数
     │   ├── turns.py     # ステップ 4: 曲がり角抽出 → route.json
+│   ├── legs.py      # ステップ 12: 写真ごとの区間に分けて 3〜4 を回し、結合
+│   ├── photos.py    # photos.json の読み込み、写真の正規化（EXIF 回転・縮小）
+│   ├── photos_map.py # 写真順の地図
+│   ├── fake_photos.py # テスト用: Street View で作成者写真を模倣
     │   ├── streetview.py # ステップ 5: 画像取得（公式パノラマ優先、候補を複数）
     │   ├── landmark.py  # ステップ 7: VLM 採点 → 1 枚選定 → 目印文・矢印経路
     │   ├── arrow.py     # ステップ 8: 矢印入り画像
@@ -372,7 +401,9 @@ scripts/
 ├── arrow.py             # ステップ 8 の確認コマンド
 ├── publish.py           # ステップ 9: 命名をキーに Supabase へ保存
 ├── show_plan.py         # 確認用: 保存した写真列を anon キーで取り出す（一覧 / 詳細 / HTML）
-├── explore_route.py     # ステップ 6: 2〜8 の一括実行（--name で 9 も）
+├── explore_route.py     # ステップ 6: 2〜8 の一括実行（--name で 9 も、--photos で 12）
+├── fake_photos.py       # ステップ 12: テスト用の写真列を作る
+├── photos_map.py        # ステップ 12: 写真順の地図
 └── snapshot_map.py      # out/map.html を PNG にする（Firefox 使用）
 tests/
 ├── fixtures/            # route_sample.json、geocode_sample.json、routes_sample.json（実レスポンス）

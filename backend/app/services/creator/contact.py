@@ -21,6 +21,8 @@ def render_contact_html(e: Exploration, title: str) -> str:
         sv = p.street_view
         src = ("公式" if "google" in (sv.copyright or "").lower() else "投稿") if sv else ""
         meta = f"撮影 {sv.date or '不明'} / {src} / 手前 {sv.offset_m:.0f} m / heading {sv.heading:.0f}° / fov {sv.fov}°" if sv else ""
+        if p.image_source == "creator_photo":
+            meta = "作成者の写真（Street View・VLM・矢印なし）"
         cand_html = ""
         if p.candidates:
             items = []
@@ -42,6 +44,7 @@ def render_contact_html(e: Exploration, title: str) -> str:
             f"""<article>
   <header><span class="idx">{p.index}</span>
     <span class="turn" style="background:{TURN_COLOR[p.turn]}">{TURN_LABEL[p.turn]}</span>
+    {'<span class="creator">📷 作成者</span>' if p.image_source == "creator_photo" else ''}
     <span class="dist">次まで {p.distance_to_next_m} m</span></header>
   {img}
   <p class="ins">{html.escape(p.instruction or '(案内文なし)')}</p>
@@ -61,6 +64,7 @@ def render_contact_html(e: Exploration, title: str) -> str:
   .idx {{ font-weight: bold; font-size: 1.2rem; }}
   .turn {{ color: #fff; padding: .1rem .5rem; border-radius: 4px; font-size: .9rem; }}
   .dist {{ margin-left: auto; color: #555; font-size: .9rem; }}
+  .creator {{ background: #2e7d32; color: #fff; padding: .1rem .5rem; border-radius: 4px; font-size: .8rem; }}
   img {{ width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }}
   .noimg {{ aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: #eee; color: #888; }}
   p {{ margin: .4rem .75rem; font-size: .9rem; }}

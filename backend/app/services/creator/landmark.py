@@ -1,6 +1,7 @@
 """ステップ 7: VLM が候補画像を採点し、最良の 1 枚を選んで目印の文章を付ける。
 
 - 候補が無い地点（Street View なし）や VLM が失敗した地点は、案内文と距離からフォールバック文を作る。
+- 作成者の写真（image_source == creator_photo）は VLM を呼ばない。caption があればそれ、無ければフォールバック文。
 - 同じ画像・同じプロンプト・同じモデルの結果はキャッシュし、再実行で API を叩かない。
 - 元の Exploration は変更せず、新しいものを返す。
 """
@@ -26,6 +27,7 @@ class LandmarkStats:
     evaluated: list[int] = field(default_factory=list)
     fallback: list[int] = field(default_factory=list)  # VLM を使えず文章だけ
     errors: dict[int, str] = field(default_factory=dict)
+    creator: list[int] = field(default_factory=list)  # 作成者の写真（VLM を呼ばない）
 
 
 def fallback_text(p: ExplorationPoint) -> str:
@@ -104,8 +106,13 @@ def evaluate_landmarks(client: VlmClient | None, e: Exploration, out_dir: Path, 
     evaluated: list[int] = []
     fallback: list[int] = []
     errors: dict[int, str] = {}
+    creator: list[int] = []
     points: list[ExplorationPoint] = []
     for p in e.points:
+        if p.image_source == "creator_photo":
+            creator.append(p.index)
+            points.append(p.model_copy(update={"landmark": p.landmark or fallback_text(p)}))
+            continue
         if client is None or not p.candidates:
             fallback.append(p.index)
             points.append(p.model_copy(update={"landmark": p.landmark or fallback_text(p)}))
@@ -119,4 +126,4 @@ def evaluate_landmarks(client: VlmClient | None, e: Exploration, out_dir: Path, 
             errors[p.index] = str(err)
             fallback.append(p.index)
             points.append(p.model_copy(update={"landmark": p.landmark or fallback_text(p)}))
-    return e.model_copy(update={"points": points}), LandmarkStats(evaluated, fallback, errors)
+    return e.model_copy(update={"points": points}), LandmarkStats(evaluated, fallback, errors, creator)

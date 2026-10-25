@@ -46,6 +46,16 @@ class VlmScore(BaseModel):
     arrow_path: list[ArrowPoint] = Field(default_factory=list)  # 現在地 → 今の道 → 通りたい道 に沿った等間隔の点列（6〜12 点）
 
 
+class CreatorPhotoMeta(BaseModel):
+    """作成者の写真の元情報。座標は撮影時のもの（経路上の点は道路に吸着した座標）。"""
+
+    id: str
+    lat: float
+    lng: float
+    accuracy_m: float | None = None
+    snapped_m: float = 0.0  # 撮影座標と経路上の点の距離
+
+
 class ImageCandidate(BaseModel):
     """1 地点に対する Street View の候補画像。向き・位置の違いで複数作る。"""
 
@@ -72,6 +82,7 @@ class ExplorationPoint(BaseModel):
     chosen_candidate: int | None = None  # ステップ 7 で VLM が選んだ候補の番号
     landmark: str | None = None
     arrow_image: str | None = None
+    creator_photo: CreatorPhotoMeta | None = None  # image_source == creator_photo のとき
 
 
 class Exploration(BaseModel):
