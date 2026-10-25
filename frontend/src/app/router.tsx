@@ -6,11 +6,13 @@ import { PublishedPage } from '../creator/pages/PublishedPage'
 import { ResultPage } from '../creator/pages/ResultPage'
 import { RouteCreatePage } from '../creator/pages/RouteCreatePage'
 import { RouteListPage } from '../creator/pages/RouteListPage'
+import { EntryPage } from '../follower/pages/EntryPage'
 import { NavigatePage } from '../follower/pages/NavigatePage'
 
 /**
  * ルーティング。
  * - /c/*     作る人（creator）
+ * - /r       参加者の入口（ID 入力。デモ用）
  * - /r/:id   参加者（follower）
  */
 export const router = createBrowserRouter([
@@ -27,5 +29,6 @@ export const router = createBrowserRouter([
       { path: 'published', element: <PublishedPage /> },
     ],
   },
+  { path: '/r', element: <EntryPage /> },
   { path: '/r/:id', element: <NavigatePage /> },
 ])
