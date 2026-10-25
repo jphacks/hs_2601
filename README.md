@@ -42,22 +42,27 @@ Web アプリ（PWA）として動作し、URL を開くだけで利用できる
 * Google Routes API（経由地を含む徒歩経路計算）
 * Google Geocoding API（出発地・目的地の座標変換）
 * Google Street View Static API / Metadata API（交差点画像の取得）
-* Claude API（画像入力による目印抽出）
+* Gemini API / Claude API（画像入力による目印抽出。既定は Gemini、設定で Claude に切り替え可能）
+* 国土地理院 地理院タイル（経路と地点の確認用地図）
 
 #### フレームワーク・ライブラリ・モジュール
-* フロントエンド: Vite, React, TypeScript, vite-plugin-pwa, turf.js, idb-keyval, qrcode.react
-* バックエンド: FastAPI, Pillow, httpx, polyline, geopy
+* フロントエンド: Vite, React, TypeScript, React Router, Tailwind CSS, jsQR
+* バックエンド: FastAPI, uvicorn, Pydantic, httpx, Pillow, polyline, segno, zxing-cpp
+* 地図表示: Leaflet
 * DB・ストレージ: Supabase（Postgres + Storage）
-* ホスティング: Vercel / Cloudflare Pages
+* テスト・品質: Vitest, oxlint, pytest
+* 開発時の公開: Cloudflare Tunnel
 
 #### デバイス
-* スマートフォン（iPhone / Android のブラウザ）。カメラは `<input capture>`、位置情報は Geolocation API を利用
+* スマートフォン（iPhone / Android のブラウザ）
+  * カメラ撮影は `<input capture>`、QR 読み取りは getUserMedia
+  * 位置情報は Geolocation API
+  * 写真への描き込みは Canvas API
 
 ### 独自技術
 #### ハッカソンで開発した独自機能・技術
 * 作成者の撮影地点を必ず経由する経路計算と、Street View による未撮影地点の自動補完
 * VLM による目印抽出と、経路の方位差から算出した矢印の画像への描画
-* 端末内で完結する到達・通り過ぎ・経路外れの判定ロジック
 * 詳細は [docs/overview.md](./docs/overview.md)、[docs/creator.md](./docs/creator.md)、[docs/follower.md](./docs/follower.md) を参照
 
 ## ディレクトリ構成
