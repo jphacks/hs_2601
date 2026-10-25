@@ -24,10 +24,11 @@ from app.api.deps import (
 from app.external.supabase.rest import SupabaseError
 from app.imaging.qr import qr_png
 from app.repositories.base import PhotoStorage, RoutePlanRepository
-from app.schemas.creator_api import CreateRouteResponse, JobStatus, PublishResponse, RouteSummary
+from app.schemas.creator_api import CreateRouteResponse, JobStatus, PublishResponse, RemoveStepsRequest, RouteSummary
 from app.schemas.creator_input import PlanInput
 from app.schemas.route_plan import RoutePlanRecord, plan_id_for, validate_plan_id
 from app.services.creator.creation import CreationJob, PipelineRunner, run_creation_job
+from app.services.creator.edit_steps import StepEditError, remove_steps
 from app.services.creator.snapshot import write_map_png
 from app.services.creator.intake import (
     MAX_PHOTO_BYTES, UploadedPhoto, match_photos, normalize_photos, parse_manifest, write_work_dir,
@@ -62,9 +63,15 @@ def _read_uploads(files: list[UploadFile]) -> list[UploadedPhoto]:
     return [UploadedPhoto(f.filename or "", f.file.read(MAX_PHOTO_BYTES + 1)) for f in files]
 
 
+PUBLISHED_LOCKED = "この名前の道案内は公開中なので、作り直せません。別の名前で作ってください。"
+
+
 def _check_owner(plan: PlanInput, route_id: str, repo: RoutePlanRepository) -> None:
+    """作業ディレクトリに触る前に確かめる。公開中の道案内は作成者本人でも上書きさせない。"""
     with supabase_errors():
         existing = repo.get_by_id(route_id)
+    if existing is not None and existing.status == "published":
+        raise HTTPException(409, PUBLISHED_LOCKED)
     if existing is not None and existing.creator_id != plan.creator_id:
         raise HTTPException(409, "同じ名前の道案内が既にあります。別の名前にしてください。")
 
@@ -131,6 +138,26 @@ def _load(plan_id: str, repo: RoutePlanRepository) -> RoutePlanRecord:
 @router.get("/routes/{plan_id}", response_model=RoutePlanRecord)
 def get_route(plan_id: str, repo: RoutePlanRepository = Depends(get_admin_repo)) -> RoutePlanRecord:
     return _load(plan_id, repo)
+
+
+@router.post("/routes/{plan_id}/steps/remove", response_model=RoutePlanRecord)
+def remove_route_steps(plan_id: str, body: RemoveStepsRequest,
+                       repo: RoutePlanRepository = Depends(get_admin_repo)) -> RoutePlanRecord:
+    """下書きの写真列から写真（地点）を外す。公開中の道案内は変えない（409）。"""
+    rec = _load(plan_id, repo)
+    if rec.status != "draft":
+        raise HTTPException(409, "公開中の道案内は変更できません。")
+    if rec.creator_id is None or rec.creator_id != body.creator_id.strip():
+        raise HTTPException(403, "この道案内は編集できません（作った人だけが編集できます）。")
+    try:
+        plan = remove_steps(rec.plan, body.indices)
+    except StepEditError as e:
+        raise HTTPException(400, str(e)) from e
+    with supabase_errors():
+        saved = repo.update_draft_plan(rec.id, plan)
+    if saved is None:  # 確かめた後に公開された・消えた
+        raise HTTPException(409, "公開中の道案内は変更できません。")
+    return saved
 
 
 @router.post("/routes/{plan_id}/publish", response_model=PublishResponse)

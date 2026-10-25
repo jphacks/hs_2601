@@ -9,8 +9,10 @@ describe('apiErrorMessage', () => {
     )
   })
 
-  it('409 は名前の付け直しを促す', () => {
-    expect(apiErrorMessage(new ApiError(409, { detail: 'conflict' }), 'x')).toContain('別の名前')
+  it('409 はバックエンドの理由を出し、無ければ名前の付け直しを促す', () => {
+    const published = 'この名前の道案内は公開中なので、作り直せません。別の名前で作ってください。'
+    expect(apiErrorMessage(new ApiError(409, { detail: published }), 'x')).toBe(published)
+    expect(apiErrorMessage(new ApiError(409, null), 'x')).toContain('別の名前')
   })
 
   it('detail が文字列でない（422 の配列など）なら状態コードの既定文か fallback', () => {

@@ -16,11 +16,10 @@ function detailOf(body: unknown): string | null {
 
 /**
  * FastAPI の `{"detail": "..."}` があればそれを、無ければ状態コードの既定文、どちらも無ければ fallback。
- * 409 は名前の付け直しを促す文を優先する。
+ * 409 はバックエンドの理由（公開中・別の人の名前・作成中）をそのまま出し、無ければ名前の付け直しを促す。
  */
 export function apiErrorMessage(e: unknown, fallback: string): string {
   if (e instanceof ApiError) {
-    if (e.status === 409) return STATUS_MESSAGE[409]
     return detailOf(e.body) ?? STATUS_MESSAGE[e.status] ?? fallback
   }
   if (e instanceof TypeError) return 'サーバーに接続できませんでした。通信状態を確認してください'

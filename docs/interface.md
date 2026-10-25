@@ -126,7 +126,7 @@ GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>
 
 ## 5. 作る人の HTTP API（フロント ⇄ FastAPI）
 
-作る人の画面（`/c`）はこの 6 本だけを呼ぶ。入力は 4 章の `PlanInput`、保存先は 1 章の `route_plans`。
+作る人の画面（`/c`）はこの 7 本だけを呼ぶ。入力は 4 章の `PlanInput`、保存先は 1 章の `route_plans`。
 レスポンスの JSON キーは camelCase（`RoutePlanRecord` だけは 1 章どおり snake_case）。エラーは FastAPI 既定の `{"detail": "..."}`。
 型は backend/app/schemas/creator_api.py と frontend/src/shared/types/creator.ts を 1:1 に保つ。
 
@@ -136,6 +136,7 @@ GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>
 | `GET /api/jobs/{jobId}` | なし | 200 `{ "jobId", "state", "step", "routeId", "message" }` |
 | `GET /api/routes?creator_id=...` | 作成者 ID | 200 `[{ "id", "name", "origin", "destination", "status", "createdAt" }]`（新しい順） |
 | `GET /api/routes/{id}` | なし | 200 `RoutePlanRecord`（下書きも返す） |
+| `POST /api/routes/{id}/steps/remove` | JSON `{ "creatorId", "indices" }` | 200 `RoutePlanRecord`（外した後） |
 | `POST /api/routes/{id}/publish` | なし | 200 `{ "routeId", "url", "qrPath" }` |
 | `GET /api/routes/{id}/qr.png` | なし | 200 PNG（`url` を符号化した QR） |
 
@@ -146,7 +147,20 @@ GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>
 - `photos` は `manifest.photos` と同じ枚数・同じ `<id>.jpg`。フロントで JPEG・長辺 1280px に変換して送る（iPhone の HEIC 対策）。写真 0 枚も可（Street View だけで作る）。
 - `routeId` は命名から決まる（3 章）ので受付時点で返す。処理はバックグラウンドで走り、終わると `route_plans` に `status = "draft"` で保存される。
 - 400: `manifest` が不正（JSON でない、必須欠け、写真ファイルの過不足、画像として開けない）。
-- 409: 同じ命名の道が別の `creator_id` で既にある（同じ作成者なら上書き）。
+- 409: 同じ命名の道が公開中（作成者本人でも上書きできない）、または別の `creator_id` で既にある（同じ作成者の下書きなら上書き）。
+
+### 公開中の道案内は変えない
+
+- 公開中（`status = "published"`）の行は、作成受付・作成ジョブの保存・CLI の保存（`publish_plan`）・写真を外す API のどれでも書き換えない。
+  画像（ストレージ）も上書きしない。保存の前に確かめ、作り直しは 409（作成ジョブでは `failed`）になる。
+- 公開中の道を直したいときは、別の名前で作り直して公開する。
+
+### 写真を外す `POST /api/routes/{id}/steps/remove`
+
+- 下書きの写真列から、`indices`（`plan.steps` の並び順、0 始まり）の地点を外す。外した地点の `distance_to_next_m` は直前に残る地点へ足し、`index` は 0 から振り直す。
+- `creatorId` はその行の `creator_id` と同じであること（403）。ゴール（最後の地点）は外せない（400）。範囲外・空も 400。
+- 公開中の行は 409。DB は `status = draft` を条件に更新するので、確かめた直後に公開されても公開中の行は変わらない。
+- ストレージの画像は消さない。
 
 ### 進み具合 `GET /api/jobs/{jobId}`
 

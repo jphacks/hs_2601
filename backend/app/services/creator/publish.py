@@ -16,6 +16,10 @@ from app.schemas.route_plan import PlanStatus, RoutePlan, RoutePlanRecord, Route
 CONTENT_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 
 
+class PublishedRouteError(ValueError):
+    """公開中の道案内を上書きしようとした。公開中の道案内は作り直し・保存で絶対に変えない。"""
+
+
 @dataclass(frozen=True)
 class PublishResult:
     record: RoutePlanRecord
@@ -58,6 +62,9 @@ def publish_plan(
     if not name:
         raise ValueError("命名（--name）が空です。")
     pid = validate_plan_id(plan_id or plan_id_for(name))
+    current = repo.get_by_id(pid)
+    if current is not None and current.status == "published":  # 画像を上げる前に止める（公開中の画像も上書きしない）
+        raise PublishedRouteError(f"道案内 {current.name!r}（id={pid}）は公開中なので上書きできません。別の名前で作ってください。")
     existing = repo.get_by_name(name)
     if existing is not None and existing.id != pid:  # name は UNIQUE。画像を上げる前に気づく
         raise ValueError(f"命名 {name!r} は既に id={existing.id} で保存されています。同じ名前で上書きするなら --id を外してください。")

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from app.schemas.route_plan import PlanStatus, RoutePlanRecord, RoutePlanSummary
+from app.schemas.route_plan import PlanStatus, RoutePlan, RoutePlanRecord, RoutePlanSummary
 
 
 class RoutePlanRepository(Protocol):
@@ -21,6 +21,10 @@ class RoutePlanRepository(Protocol):
 
     def set_status(self, plan_id: str, status: PlanStatus) -> RoutePlanRecord | None:
         """status だけを変える。行が無ければ None。"""
+        ...
+
+    def update_draft_plan(self, plan_id: str, plan: RoutePlan) -> RoutePlanRecord | None:
+        """下書き（status = draft）の行だけ plan を書き換える。公開中・行なしなら何もせず None。"""
         ...
 
 

@@ -1,15 +1,18 @@
 import { RoutePlanViewer } from '../../shared/components/RoutePlanViewer'
 import type { RoutePlanRecord } from '../../shared/types/routePlan'
+import { StepRemover } from './StepRemover'
 import { buttonClass, secondaryClass } from './styles'
 
 interface Props {
   record: RoutePlanRecord
   onPublish: () => void
   onEdit: () => void
+  /** 写真を外した後の行。下書きのときだけ使う */
+  onRecordChange: (record: RoutePlanRecord) => void
 }
 
 /** 作成した道案内の確認画面。写真列は参加者画面と同じ RoutePlanViewer で描く */
-export function RouteDetail({ record, onPublish, onEdit }: Props) {
+export function RouteDetail({ record, onPublish, onEdit, onRecordChange }: Props) {
   return (
     <section className="space-y-5">
       <h1 className="text-2xl font-bold">道案内の確認</h1>
@@ -26,7 +29,13 @@ export function RouteDetail({ record, onPublish, onEdit }: Props) {
         </p>
       </div>
 
-      <RoutePlanViewer plan={record.plan} />
+      <RoutePlanViewer key={record.plan.steps.length} plan={record.plan} />
+
+      {record.status === 'draft' ? (
+        <StepRemover record={record} onRemoved={onRecordChange} />
+      ) : (
+        <p className="text-sm text-stone-500">公開中の道案内は、写真を外したり作り直したりできません。</p>
+      )}
 
       <button className={buttonClass} onClick={onPublish}>
         公開画面へ

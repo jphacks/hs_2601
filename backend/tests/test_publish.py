@@ -112,8 +112,8 @@ def test_Supabaseリポジトリは行を上書き保存して取り出せる(tm
     rest = SupabaseRest("https://p.supabase.co", "k", http=httpx.Client(transport=httpx.MockTransport(handler)))
     repo, storage = SupabaseRoutePlanRepository(rest), SupabasePhotoStorage(rest)
     e = load_with_images(tmp_path)
-    first = publish_plan(e, tmp_path, "上書き", repo, storage).record
-    second = publish_plan(e.model_copy(update={"total_distance_m": 999}), tmp_path, "上書き", repo, storage).record
+    first = publish_plan(e, tmp_path, "上書き", repo, storage, status="draft").record  # 下書きなら作り直しで上書きできる
+    second = publish_plan(e.model_copy(update={"total_distance_m": 999}), tmp_path, "上書き", repo, storage, status="draft").record
     assert first.id == second.id and len(table) == 1
     assert repo.get_by_id(first.id) == second and repo.get_by_name("上書き") == second
     assert repo.get_by_id("nope") is None
@@ -140,3 +140,42 @@ def test_同じ命名が別IDで存在すれば画像を上げる前に止める
     with pytest.raises(ValueError, match="既に"):
         publish_plan(e, tmp_path, "重複", repo, storage, plan_id="other1")
     assert len(storage.files) == n
+
+
+def test_公開中の道案内は上書きせず_画像も上げない(tmp_path: Path) -> None:
+    import pytest
+    from app.services.creator.publish import PublishedRouteError
+
+    class CountingStorage:
+        def __init__(self) -> None:
+            self.puts = 0
+
+        def put(self, path: str, data: bytes, content_type: str) -> str:
+            self.puts += 1
+            return f"https://cdn/{path}"
+
+    repo, storage = MemoryRepo(), CountingStorage()
+    e = load_with_images(tmp_path)
+    published = publish_plan(e, tmp_path, "公開中", repo, storage).record  # CLI の既定は公開
+    before = storage.puts
+    with pytest.raises(PublishedRouteError):
+        publish_plan(e.model_copy(update={"total_distance_m": 999}), tmp_path, "公開中", repo, storage, status="draft")
+    assert storage.puts == before  # 公開中の画像を上書きしていない
+    assert repo.get_by_id(published.id) == published  # 行もそのまま（公開のまま）
+
+
+def test_Supabaseの下書き更新は_下書きの行だけを条件にplan_jsonを書き換える(tmp_path: Path) -> None:
+    import json
+
+    from app.schemas.route_plan import RoutePlan
+    seen: dict = {}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        seen.update(method=req.method, params=dict(req.url.params), body=json.loads(req.content))
+        return httpx.Response(200, json=[])  # 条件に合う行なし（= 公開中など）
+
+    rest = SupabaseRest("https://p.supabase.co", "k", http=httpx.Client(transport=httpx.MockTransport(handler)))
+    plan = RoutePlan(origin="a", destination="b", polyline="", total_distance_m=0, steps=[])
+    assert SupabaseRoutePlanRepository(rest).update_draft_plan("abc123def456", plan) is None
+    assert seen["method"] == "PATCH" and seen["params"] == {"id": "eq.abc123def456", "status": "eq.draft"}
+    assert set(seen["body"]) == {"plan_json"}

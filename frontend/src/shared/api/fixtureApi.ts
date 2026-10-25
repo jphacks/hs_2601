@@ -6,6 +6,7 @@
 import samplePlanJson from '../fixtures/sampleRoutePlan.json'
 import { FIXTURE_CREATE_DELAY_MS, JOB_STEPS, GOAL_PHOTO_LABEL } from '../lib/constants'
 import { toIsoWithOffset } from '../lib/datetime'
+import { removeSteps, StepEditError } from '../lib/removeSteps'
 import type { CreateRouteInput, JobStep, RouteSummary } from '../types/creator'
 import type { RoutePlan, RoutePlanRecord } from '../types/routePlan'
 import { ApiError } from './client'
@@ -151,6 +152,9 @@ export function createFixtureApi(options: FixtureApiOptions = {}): RouteApi {
       // 最初から入っている分は本物の ID なので、名前でも突き合わせる
       const existing = [...state.records.values()].find((s) => s.record.name === name)
       const routeId = existing?.record.id ?? fixtureRouteId(name)
+      if (existing?.record.status === 'published') {
+        throw new ApiError(409, { detail: 'この名前の道案内は公開中なので、作り直せません。別の名前で作ってください。' })
+      }
       if (existing && existing.creatorId !== input.creatorId) {
         throw new ApiError(409, { detail: `同じ名前の道が既にあります: ${input.name}` })
       }
@@ -184,6 +188,26 @@ export function createFixtureApi(options: FixtureApiOptions = {}): RouteApi {
 
     async getRoutePlan(routeId) {
       return requireStored(routeId).record
+    },
+
+    async removeSteps(routeId, creatorId, indices) {
+      const stored = requireStored(routeId)
+      if (stored.record.status !== 'draft') {
+        throw new ApiError(409, { detail: '公開中の道案内は変更できません。' })
+      }
+      if (stored.creatorId === undefined || stored.creatorId !== creatorId) {
+        throw new ApiError(403, { detail: 'この道案内は編集できません（作った人だけが編集できます）。' })
+      }
+      let plan
+      try {
+        plan = removeSteps(stored.record.plan, indices)
+      } catch (e) {
+        if (e instanceof StepEditError) throw new ApiError(400, { detail: e.message })
+        throw e
+      }
+      const updated: StoredRecord = { ...stored, record: { ...stored.record, plan } }
+      state = { ...state, records: withEntry(state.records, routeId, updated) }
+      return updated.record
     },
 
     async publishRoute(routeId) {

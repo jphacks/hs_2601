@@ -57,6 +57,13 @@ class MemoryRepo:
         self.rows[plan_id] = rec.model_copy(update={"status": status})
         return self.rows[plan_id]
 
+    def update_draft_plan(self, plan_id: str, plan) -> RoutePlanRecord | None:  # noqa: ANN001
+        rec = self.rows.get(plan_id)
+        if rec is None or rec.status != "draft":
+            return None
+        self.rows[plan_id] = rec.model_copy(update={"plan": plan})
+        return self.rows[plan_id]
+
 
 class FakePipeline:
     """fixture の Exploration を返す。最初の地点の画像を 1 枚目の写真にして、保存（画像アップロード）まで通す。"""
@@ -259,3 +266,66 @@ def test_無いIDと不正なIDは404(ctx: Ctx, path: str) -> None:
 
 def test_無い道案内の公開は404(ctx: Ctx) -> None:
     assert ctx.client.post("/api/routes/abcdef123456/publish").status_code == 404
+
+
+# --- 公開中の道案内を守る ---
+
+def test_公開中の道案内は同じ作成者でも作り直せない_作業ディレクトリも消さない(ctx: Ctx) -> None:
+    assert ctx.post(manifest()).status_code == 202
+    assert ctx.client.post(f"/api/routes/{RID}/publish").status_code == 200
+    published = ctx.repo.rows[RID]
+    kept = ctx.work_root / RID / "photos" / "p1.jpg"
+    assert kept.exists()
+
+    res = ctx.post(manifest(1))
+    assert res.status_code == 409 and "公開中" in res.json()["detail"]
+    assert ctx.repo.rows[RID] == published and len(ctx.pipeline.calls) == 1  # 保存もパイプラインも走らない
+    assert kept.exists()  # 前回の作業ディレクトリもそのまま
+
+
+# --- 写真列から写真を外す ---
+
+def _draft_with_steps(ctx: Ctx, distances: list[int]) -> None:
+    assert ctx.post(manifest()).status_code == 202
+    rec = ctx.repo.rows[RID]
+    base = rec.plan.steps[0]
+    turns = ["straight"] + ["left"] * (len(distances) - 2) + ["arrive"]
+    steps = [base.model_copy(update={"index": i, "turn": t, "distance_to_next_m": d, "image_url": f"https://cdn/{i}.png"})
+             for i, (t, d) in enumerate(zip(turns, distances))]
+    ctx.repo.rows[RID] = rec.model_copy(update={"plan": rec.plan.model_copy(update={"steps": steps})})
+
+
+def _remove(ctx: Ctx, indices: list[int], creator_id: str = "c_me"):
+    return ctx.client.post(f"/api/routes/{RID}/steps/remove", json={"creatorId": creator_id, "indices": indices})
+
+
+def test_下書きの写真を選んで外すと_距離は直前の地点に足される(ctx: Ctx) -> None:
+    _draft_with_steps(ctx, [100, 20, 30, 50, 0])
+    res = _remove(ctx, [1, 2])
+    assert res.status_code == 200, res.text
+    steps = res.json()["plan"]["steps"]
+    assert [s["image_url"] for s in steps] == ["https://cdn/0.png", "https://cdn/3.png", "https://cdn/4.png"]
+    assert [s["distance_to_next_m"] for s in steps] == [150, 50, 0] and [s["index"] for s in steps] == [0, 1, 2]
+    assert ctx.repo.rows[RID].status == "draft" and len(ctx.repo.rows[RID].plan.steps) == 3
+
+
+def test_ゴールは外せず_範囲外や空は400(ctx: Ctx) -> None:
+    _draft_with_steps(ctx, [100, 20, 0])
+    assert _remove(ctx, [2]).status_code == 400
+    assert _remove(ctx, [5]).status_code == 400
+    assert _remove(ctx, []).status_code == 422
+    assert len(ctx.repo.rows[RID].plan.steps) == 3
+
+
+def test_公開中の道案内からは外せない(ctx: Ctx) -> None:
+    _draft_with_steps(ctx, [100, 20, 0])
+    assert ctx.client.post(f"/api/routes/{RID}/publish").status_code == 200
+    before = ctx.repo.rows[RID]
+    res = _remove(ctx, [1])
+    assert res.status_code == 409 and ctx.repo.rows[RID] == before
+
+
+def test_他の作成者は外せない(ctx: Ctx) -> None:
+    _draft_with_steps(ctx, [100, 20, 0])
+    assert _remove(ctx, [1], creator_id="c_other").status_code == 403
+    assert len(ctx.repo.rows[RID].plan.steps) == 3

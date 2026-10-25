@@ -20,7 +20,7 @@ from app.schemas.creator_api import JobStep
 from app.schemas.creator_input import PlanInput
 from app.services.creator.jobs import JobStore
 from app.services.creator.pipeline import PipelineResult, Reporter
-from app.services.creator.publish import publish_plan
+from app.services.creator.publish import PublishedRouteError, publish_plan
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +45,8 @@ class CreationJob:
 def failure_message(err: Exception, step: JobStep | None) -> str:
     """利用者向けの日本語。内部の詳細（キーや URL）は出さない。"""
     where = f"{STEP_LABEL[step]}中に" if step else ""
+    if isinstance(err, PublishedRouteError):
+        return "この名前の道案内は公開中なので、作り直せません。別の名前で作ってください。"
     if isinstance(err, GeocodingError):
         return "出発地か目的地が見つかりませんでした。地名を変えて作り直してください。"
     if isinstance(err, ValueError) and step == "route":

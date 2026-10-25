@@ -27,6 +27,9 @@ export const serverApi: RouteApi = {
   getRoutePlan(routeId) {
     return api.get<RoutePlanRecord>(`/api/routes/${id(routeId)}`)
   },
+  removeSteps(routeId, creatorId, indices) {
+    return api.post<RoutePlanRecord>(`/api/routes/${id(routeId)}/steps/remove`, { creatorId, indices })
+  },
   publishRoute(routeId) {
     return api.post<PublishResult>(`/api/routes/${id(routeId)}/publish`)
   },

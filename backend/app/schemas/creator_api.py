@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.schemas.route_plan import PlanStatus
@@ -47,6 +47,13 @@ class RouteSummary(CamelModel):
     destination: str
     status: PlanStatus
     created_at: str | None = None
+
+
+class RemoveStepsRequest(CamelModel):
+    """POST /api/routes/{id}/steps/remove。indices は写真列の並び順（0 始まり）。"""
+
+    creator_id: str = Field(min_length=1, max_length=100)
+    indices: list[int] = Field(min_length=1, max_length=200)
 
 
 class PublishResponse(CamelModel):
