@@ -27,11 +27,12 @@ describe('validateDraft', () => {
   it('出発地が空白だけならエラー。目的地は空でもよい（最後の写真がゴール）', () => {
     expect(validateDraft(draft({ origin: ' ' }))).toBe('出発地を入力してください')
     expect(validateDraft(draft({ destination: '' }))).toBeNull()
-    expect(validateDraft(draft({ destination: '', photos: [] }))).toBe('目印となる写真を撮影してください')
+    expect(validateDraft(draft({ destination: '', photos: [] }))).toBe('目的地を入力するか、写真を撮影してください')
   })
 
-  it('写真がなければエラー', () => {
-    expect(validateDraft(draft({ photos: [] }))).toBe('目印となる写真を撮影してください')
+  it('目的地があれば写真が 0 枚でも作れる', () => {
+    expect(validateDraft(draft({ photos: [] }))).toBeNull()
+    expect(buildCreateInput(draft({ photos: [] }), [], 'c1', 'x').photos).toEqual([])
   })
 
   it('位置情報が取れなかった写真があれば、その番号を出してエラー', () => {

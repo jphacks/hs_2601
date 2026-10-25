@@ -20,7 +20,7 @@ export function PhotoGrid({ photos, onRemove, onRetryLocation, onAnnotate }: Pro
   if (photos.length === 0) {
     return (
       <div className="rounded-xl bg-stone-50 p-6 text-center text-sm text-stone-500">
-        まだ写真がありません
+        まだ写真がありません（写真なしでも、目的地があれば Street View だけで道を作れます）
       </div>
     )
   }

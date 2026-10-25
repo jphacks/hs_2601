@@ -99,7 +99,7 @@ export function RouteCreateForm({
         <div>
           <h2 className="font-bold">目印の写真</h2>
           <p className="mt-1 text-sm text-stone-500">
-            曲がり角や入口など、迷いやすい場所を撮影してください。
+            曲がり角や入口など、迷いやすい場所を撮影してください（任意）。
           </p>
         </div>
 
