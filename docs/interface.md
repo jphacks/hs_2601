@@ -1,6 +1,6 @@
 # 作る人（backend）と参加者（frontend）の契約
 
-バックエンドとフロントエンドを独立に開発するための接点。接点はこの 3 点だけで、両側はこれを見て別々に進める。
+バックエンドとフロントエンドを独立に開発するための接点。参加者側は 1〜3 章、作る人側は 4〜5 章を見て、両側が別々に進める。
 **変えるときは両側を同時に変える**（型は backend/app/schemas/route_plan.py と frontend/src/shared/types/routePlan.ts）。
 
 ## 1. データの形: `RoutePlanRecord`
@@ -122,6 +122,48 @@ GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>
 - バックエンドは受信時に EXIF の回転を適用し長辺 1280px に縮小して `photos/<id>.jpg` に置き、`manifest` を `photos.json` として保存する。
   以降の処理はこのディレクトリだけを見る。HEIC など開けない形式は受け付けない。
 - 経路は「出発地 → 写真 1 → … → 写真 n → 目的地」を区間ごとに計算して結合する。写真地点は `image_source = "creator_photo"` として写真列に入り、矢印は描かれない。
+
+## 5. 作る人の HTTP API（フロント ⇄ FastAPI）
+
+作る人の画面（`/c`）はこの 6 本だけを呼ぶ。入力は 4 章の `PlanInput`、保存先は 1 章の `route_plans`。
+レスポンスの JSON キーは camelCase（`RoutePlanRecord` だけは 1 章どおり snake_case）。エラーは FastAPI 既定の `{"detail": "..."}`。
+型は backend/app/schemas/creator_api.py と frontend/src/shared/types/creator.ts を 1:1 に保つ。
+
+| メソッドとパス | 入力 | 出力 |
+|---|---|---|
+| `POST /api/routes` | multipart: `manifest`（`PlanInput` の JSON 文字列）、`photos`（ファイル、名前は `<id>.jpg`） | 202 `{ "jobId", "routeId" }` |
+| `GET /api/jobs/{jobId}` | なし | 200 `{ "jobId", "state", "step", "routeId", "message" }` |
+| `GET /api/routes?creator_id=...` | 作成者 ID | 200 `[{ "id", "name", "origin", "destination", "status", "createdAt" }]`（新しい順） |
+| `GET /api/routes/{id}` | なし | 200 `RoutePlanRecord`（下書きも返す） |
+| `POST /api/routes/{id}/publish` | なし | 200 `{ "routeId", "url", "qrPath" }` |
+| `GET /api/routes/{id}/qr.png` | なし | 200 PNG（`url` を符号化した QR） |
+
+### 作成受付 `POST /api/routes`
+
+- `manifest` は 4 章の `PlanInput`。`name`・`origin`・`destination`・`creator_id`・`photos[]` を必ず入れる。
+  `photos[].image` は `photos/<id>.jpg`、`photos[].lat` `lng` は必須（位置が取れなかった写真は送らない）。
+- `photos` は `manifest.photos` と同じ枚数・同じ `<id>.jpg`。フロントで JPEG・長辺 1280px に変換して送る（iPhone の HEIC 対策）。写真 0 枚も可（Street View だけで作る）。
+- `routeId` は命名から決まる（3 章）ので受付時点で返す。処理はバックグラウンドで走り、終わると `route_plans` に `status = "draft"` で保存される。
+- 400: `manifest` が不正（JSON でない、必須欠け、写真ファイルの過不足、画像として開けない）。
+- 409: 同じ命名の道が別の `creator_id` で既にある（同じ作成者なら上書き）。
+
+### 進み具合 `GET /api/jobs/{jobId}`
+
+- `state`: `running` / `done` / `failed`。`done` のとき `routeId`、`failed` のとき `message`（利用者向けの日本語）。
+- `step`: `geocode` / `route` / `streetview` / `landmark` / `arrow` / `save`（画面の「◯◯中…」表示用。任意）。
+- ジョブはサーバーのメモリに持つ。サーバーを再起動すると 404 になる（下書きが保存済みなら一覧からは開ける）。
+
+### 公開 `POST /api/routes/{id}/publish`
+
+- `status` を `published` にする。以降は参加者（2 章、anon キー）からも読める。
+- `url` は `{PUBLIC_BASE_URL}/r/{id}`（3 章）。`PUBLIC_BASE_URL` はフロント（参加者画面）の公開 URL にする。
+- `qrPath` は `/api/routes/{id}/qr.png`。フロントは `VITE_API_BASE_URL` を前に付けて `<img src>` に入れる。
+- 下書きでも公開済みでも呼べる（2 回目以降は URL を返すだけ）。
+
+### 一覧と詳細
+
+- 一覧は `route_plans.creator_id` で絞る（列を追加する）。`creator_id` を渡さなければ 400。
+- 詳細は作成者の確認画面用で、下書きも返す。認証はしない（ハッカソン範囲。ID を知っていれば読める）。
 
 ## 確認の仕方
 
