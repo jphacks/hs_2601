@@ -233,6 +233,59 @@ python -m scripts.arrow --from-route ./out/cases/4
 - VLM の経路が無い地点は turn ごとの既定形で描く。
 - `contact.html` と `map.html` は矢印入り画像を優先して表示する。`scripts.explore_route` はここまで一括で実行する。
 
+### ステップ 9: 写真列の保存（Supabase、命名をキーに）
+
+出力ディレクトリの写真列（矢印入り画像 + 地点情報）を、命名をキーにして Supabase に保存する。
+DB は Postgres のテーブル `route_plans`、画像は公開バケット `plans`。参加者向けの公開形式は `app/schemas/route_plan.py`。
+
+```bash
+# 初回のみ: Supabase にログインしてプロジェクトを紐づけ、テーブルとバケットを作る
+supabase login
+supabase link --project-ref <project-ref>        # リポジトリ直下で実行
+supabase db push --linked                        # supabase/migrations/ を適用
+
+# .env に SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_ANON_KEY を書く（.env.example 参照）
+python -m scripts.publish --from-route ./out/cases/5 --name "四天王寺→てんしば"           # 出力済みのディレクトリを保存
+python -m scripts.explore_route "四天王寺 南大門" "天王寺公園 てんしば" --out ./out/cases/5 --name "四天王寺→てんしば"   # 生成から保存まで一括
+```
+
+保存した写真列を確認する（参加者と同じ anon キーで読む）:
+
+```bash
+python -m scripts.show_plan --list                                   # 保存済み一覧
+python -m scripts.show_plan --name "四天王寺→てんしば"                  # 地点と画像 URL
+python -m scripts.show_plan --name "四天王寺→てんしば" --html ./out/plan.html && explorer.exe out/plan.html   # 画像を並べて見る
+```
+
+ブラウザで見るなら Supabase ダッシュボードの Table Editor（`route_plans`）と Storage（`plans` バケット）。
+
+### ステップ 10: QR コード（参加者 URL）
+
+契約は [docs/interface.md](../docs/interface.md)。参加者画面の URL は `{PUBLIC_BASE_URL}/r/<id>` で、QR はこれを符号化したもの。
+`.env` に `PUBLIC_BASE_URL` があれば、`scripts.publish` と `scripts.explore_route --name` が `<dir>/qr.png` を出す。
+フロントのデプロイ前は `http://localhost:5173`（Vite の開発サーバー）で良く、デプロイ後に差し替えて保存し直す。
+
+参加者の流れ（QR を読む → URL → id → anon キーで取得 → 表示）はバックエンドだけで確認できる:
+
+```bash
+python -m scripts.show_plan --qr ./out/cases/5/qr.png --html ./out/cases/5/plan.html   # スマホの代わりに QR を読んで取得
+pytest                     # モック版（tests/test_follower_flow.py）。外部に出ない
+pytest -m live             # 実際の Supabase を叩く版（保存済みの「四天王寺→てんしば」を QR 経由で取得し、画像も取る）
+```
+
+QR の生成は `segno`、読み取り（テスト・確認用）は `zxing-cpp`。参加者側のロジックは `app/services/follower/`。
+
+| 出力 | 内容 |
+|---|---|
+| `route_plans` の 1 行 | `id`（命名の SHA-256 先頭 12 桁）、`name`、`status`、`plan_json`（ステップ配列 + ポリライン） |
+| `plans/<id>/NNN.jpg` | 矢印入り画像（無い地点は採用画像）。公開 URL が `plan_json.steps[].image_url` に入る |
+| `<dir>/published.json` | 保存内容の控え |
+
+- **同じ `--name` で実行し直すと同じ ID に上書きされる。** 別の道案内として残したいときは名前を変えるか `--id` を指定する。
+- 参加者側は anon キーで `GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>` か `?name=eq.<名前>` を叩けば読める（RLS で `status = 'published'` の行だけ）。画像 URL は認証なしで開ける。
+- 書き込みは service_role キーだけ。フロントに渡さない。
+- SDK は使わず、`app/external/supabase/rest.py` が PostgREST と Storage の REST を httpx で叩く。
+
 ## 構成
 
 ```
@@ -244,14 +297,21 @@ app/
 │   ├── creator.py       # 作る人向け API（作成受付 / ステータス / 一覧 / 公開）
 │   └── follower.py      # 参加者向け API（公開済み詳細取得）
 ├── schemas/
-│   └── exploration.py   # 経路探索の中間形式 route.json（内部用）
+│   ├── exploration.py   # 経路探索の中間形式 route.json（内部用）
+│   └── route_plan.py    # 参加者に渡す公開形式（route_plans.plan_json）
 ├── external/
 │   └── google/
 │       ├── geocoding.py   # Geocoding API クライアント
 │       ├── routes.py      # Routes API クライアント
 │       └── street_view.py # Street View Metadata / Static API クライアント
 ├── imaging/
-│   └── arrow.py         # 曲線の矢印を描く（Pillow、純粋な描画）
+│   ├── arrow.py         # 曲線の矢印を描く（Pillow、純粋な描画）
+│   └── qr.py            # QR の生成（segno）と読み取り（zxing-cpp）
+├── external/supabase/
+│   └── rest.py          # PostgREST / Storage クライアント（httpx）
+├── repositories/
+│   ├── base.py          # RoutePlanRepository / PhotoStorage のインターフェース
+│   └── supabase_repo.py # Supabase 実装（テーブル route_plans、バケット plans）
 ├── external/vlm/
 │   ├── base.py          # VLM 共通インターフェース、返答 JSON の解釈
 │   ├── gemini.py        # Gemini API（REST、429 再試行）
@@ -267,10 +327,14 @@ app/
     │   ├── streetview.py # ステップ 5: 画像取得（公式パノラマ優先、候補を複数）
     │   ├── landmark.py  # ステップ 7: VLM 採点 → 1 枚選定 → 目印文・矢印経路
     │   ├── arrow.py     # ステップ 8: 矢印入り画像
+│   ├── publish.py   # ステップ 9: 写真列を公開形式にして DB・ストレージへ保存
+│   ├── qr.py        # ステップ 10: 参加者 URL の QR を qr.png に出す
     │   ├── cache.py     # 外部 API レスポンスのファイルキャッシュ
     │   ├── contact.py   # 確認用の画像一覧 HTML
     │   └── mapview.py   # 確認用の地図 HTML（Leaflet + 地理院タイル）
     └── follower/
+        ├── fetch.py     # QR の URL → id → 写真列の取得（契約: docs/interface.md）
+        └── view.py      # 確認用の表示 HTML（フロントの代わり）
 scripts/
 ├── geocode.py           # ステップ 2 の確認コマンド
 ├── route.py             # ステップ 3 の確認コマンド
@@ -278,7 +342,9 @@ scripts/
 ├── streetview.py        # ステップ 5 の確認コマンド
 ├── landmark.py          # ステップ 7 の確認コマンド
 ├── arrow.py             # ステップ 8 の確認コマンド
-├── explore_route.py     # ステップ 6: 2〜8 の一括実行
+├── publish.py           # ステップ 9: 命名をキーに Supabase へ保存
+├── show_plan.py         # 確認用: 保存した写真列を anon キーで取り出す（一覧 / 詳細 / HTML）
+├── explore_route.py     # ステップ 6: 2〜8 の一括実行（--name で 9 も）
 └── snapshot_map.py      # out/map.html を PNG にする（Firefox 使用）
 tests/
 ├── fixtures/            # route_sample.json、geocode_sample.json、routes_sample.json（実レスポンス）

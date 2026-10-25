@@ -1,27 +1,32 @@
 import { useRef } from 'react'
-import type { Photo } from '../types'
+import type { CapturedPhoto } from '../types'
 import { PhotoGrid } from './PhotoGrid'
 import { buttonClass, inputClass, secondaryClass } from './styles'
 
 interface Props {
-  start: string
-  goal: string
-  photos: Photo[]
-  onStartChange: (value: string) => void
-  onGoalChange: (value: string) => void
+  origin: string
+  destination: string
+  photos: CapturedPhoto[]
+  /** 検証・通信エラー。なければ null */
+  error: string | null
+  submitting: boolean
+  onOriginChange: (value: string) => void
+  onDestinationChange: (value: string) => void
   onAddPhotos: (files: FileList | null) => void
-  onRemovePhoto: (photo: Photo) => void
+  onRemovePhoto: (photo: CapturedPhoto) => void
   onSubmit: () => void
   onCancel: () => void
 }
 
 /** 「道を作る」画面。出発地・目的地の入力と目印写真の追加 */
 export function RouteCreateForm({
-  start,
-  goal,
+  origin,
+  destination,
   photos,
-  onStartChange,
-  onGoalChange,
+  error,
+  submitting,
+  onOriginChange,
+  onDestinationChange,
   onAddPhotos,
   onRemovePhoto,
   onSubmit,
@@ -41,8 +46,8 @@ export function RouteCreateForm({
         <span className="text-sm font-semibold">出発地</span>
         <input
           className={inputClass}
-          value={start}
-          onChange={(e) => onStartChange(e.target.value)}
+          value={origin}
+          onChange={(e) => onOriginChange(e.target.value)}
           placeholder="例：広島駅"
         />
       </label>
@@ -50,8 +55,8 @@ export function RouteCreateForm({
         <span className="text-sm font-semibold">目的地</span>
         <input
           className={inputClass}
-          value={goal}
-          onChange={(e) => onGoalChange(e.target.value)}
+          value={destination}
+          onChange={(e) => onDestinationChange(e.target.value)}
           placeholder="例：平和記念公園"
         />
       </label>
@@ -81,8 +86,14 @@ export function RouteCreateForm({
         <PhotoGrid photos={photos} onRemove={onRemovePhoto} />
       </div>
 
-      <button className={buttonClass} onClick={onSubmit}>
-        道案内を作成する
+      {error && (
+        <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+
+      <button className={`${buttonClass} disabled:opacity-50`} disabled={submitting} onClick={onSubmit}>
+        {submitting ? '送信中...' : '道案内を作成する'}
       </button>
       <button className={secondaryClass} onClick={onCancel}>
         キャンセル

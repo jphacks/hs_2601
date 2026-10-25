@@ -1,10 +1,12 @@
 /**
  * バックエンド通信の共通ラッパー。
- * 各 API 関数（endpoints.ts に追加予定）はこれを経由して呼ぶ。
+ * 各 API 関数（endpoints.ts）はこれを経由して呼ぶ。
  */
 
-const BASE_URL: string =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+const DEFAULT_BASE_URL = 'http://localhost:8000'
+
+/** 末尾の / を落として、path 側の先頭 / と二重にならないようにする */
+const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, '')
 
 export class ApiError extends Error {
   readonly status: number

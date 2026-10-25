@@ -22,3 +22,13 @@ def test_未設定なら分かりやすいエラー(monkeypatch: pytest.MonkeyPa
 def test_get_settings_はキャッシュされる() -> None:
     get_settings.cache_clear()
     assert get_settings() is get_settings()
+
+
+def test_supabase_未設定なら分かりやすいエラー(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="SUPABASE_URL"):
+        Settings(_env_file=None).require_supabase()
+    monkeypatch.setenv("SUPABASE_URL", "https://p.supabase.co/")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "svc")
+    assert Settings(_env_file=None).require_supabase() == ("https://p.supabase.co", "svc")

@@ -4,9 +4,12 @@
   python -m scripts.explore_route "大阪駅" "グランフロント大阪" --out ./out
   python -m scripts.explore_route "大阪駅" "グランフロント大阪" --via "梅田スカイビル" --out ./out
   python -m scripts.explore_route "大阪駅" "グランフロント大阪" --no-cache     # キャッシュを使わず必ず API を叩く
+  python -m scripts.explore_route "大阪駅" "グランフロント大阪" --name "大阪駅→グランフロント"   # 最後に Supabase へ保存
 
 処理: geocode → route → turns → streetview（候補を複数）→ landmark（VLM が採点して 1 枚を選び、目印文と矢印の経路を返す）→ arrow（曲線の矢印を描く）
+      → --name があれば publish（命名をキーに Supabase の route_plans と plans バケットへ保存。同名は上書き）
 出力: out/route.json, out/images/, out/raw/, out/map.html, out/contact.html, map.png, contact.png（PNG は --no-png で省略）
+      --name 時は out/published.json と、PUBLIC_BASE_URL があれば out/qr.png も
 キャッシュ: 同じ地名・座標・パノラマ・画像+プロンプトなら backend/.cache/ を再利用する。
 VLM のキーが無いときは --no-vlm と同じ（フォールバック文のみ）。
 """
@@ -22,12 +25,16 @@ from app.external.google.routes import RoutesClient
 from app.external.google.street_view import StreetViewClient
 from app.external.vlm.base import VlmError
 from app.external.vlm.factory import make_vlm_client
+from app.external.supabase.rest import SupabaseRest
+from app.repositories.supabase_repo import SupabasePhotoStorage, SupabaseRoutePlanRepository
 from app.services.creator.cache import FileCache
 from app.services.creator.contact import TURN_LABEL, render_contact_html
 from app.services.creator.geocode import geocode_queries
 from app.services.creator.route import compute_route
 from app.services.creator.arrow import draw_arrows
 from app.services.creator.landmark import evaluate_landmarks
+from app.services.creator.publish import publish_plan
+from app.services.creator.qr import write_qr
 from app.services.creator.streetview import StreetViewOptions, fetch_candidates
 from app.services.creator.turns import extract_turns
 from scripts.snapshot_map import write_snapshots
@@ -47,10 +54,13 @@ def main() -> None:
     ap.add_argument("--offset-m", type=float, default=0.0)
     ap.add_argument("--no-vlm", action="store_true", help="VLM の採点を行わず、フォールバック文だけ付ける")
     ap.add_argument("--no-png", action="store_true", help="map.png と contact.png を出さない（既定は Firefox があれば出す）")
+    ap.add_argument("--name", default=None, help="命名をキーにして Supabase へ保存する（同名は上書き）")
+    ap.add_argument("--id", default=None, help="--name と併用。公開 ID を指定する（既定: 命名のハッシュ）")
     args = ap.parse_args()
 
     settings = get_settings()
     key = settings.require_google_maps_api_key()
+    supabase = SupabaseRest(*settings.require_supabase()) if args.name else None  # 保存先の設定不足は最初に気づく
     out_dir: Path = args.out or settings.out_dir
     (out_dir / "raw").mkdir(parents=True, exist_ok=True)
     cache = None if args.no_cache else FileCache(settings.cache_dir, "google")
@@ -104,6 +114,16 @@ def main() -> None:
     print(f"\n一覧: {out_dir / 'contact.html'}\n地図: {out_dir / 'map.html'}")
     if not args.no_png:
         write_snapshots(out_dir)
+
+    # 9. 命名をキーに Supabase へ保存
+    if supabase:
+        res = publish_plan(e, out_dir, args.name, SupabaseRoutePlanRepository(supabase), SupabasePhotoStorage(supabase), plan_id=args.id)
+        (out_dir / "published.json").write_text(res.record.model_dump_json(indent=2), encoding="utf-8")
+        print(f"[9] publish: name={res.record.name!r} id={res.record.id}  画像 {len(res.uploaded)} / なし {len(res.skipped)}")
+        print(f"    取得: {settings.supabase_url}/rest/v1/route_plans?name=eq.{res.record.name}  （apikey: anon キー）")
+        if settings.public_base_url:
+            qr = write_qr(out_dir, settings.public_base_url, res.record.id)
+            print(f"    QR: {qr.path}  →  {qr.url}")
 
 
 if __name__ == "__main__":

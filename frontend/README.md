@@ -8,13 +8,22 @@ Web フロントエンド（Vite + React + TypeScript）。
 ```bash
 npm install     # 初回のみ
 npm run dev
+npm test        # vitest（通信層・検証ロジックの単体テスト）
+npm run lint    # oxlint（creator ⇄ follower の import 禁止も検査）
 ```
+
+バックエンド未接続の間は **fixture モード**（既定）で動く。写真列は
+`src/shared/fixtures/sampleRoutePlan.json`（`backend/out/cases/5` を publish したもの）を返し、
+作成・公開はブラウザのメモリ上だけで完結する（リロードで消える）。
 
 | URL | 期待する表示 |
 |---|---|
 | http://localhost:5173/ | `/c` にリダイレクト |
-| http://localhost:5173/c | 「作る人」の見出し |
-| http://localhost:5173/r/sample | 「参加者」「道案内 ID: sample」 |
+| http://localhost:5173/c | 作る人のホーム（「道を作る」「作った道を公開する」） |
+| http://localhost:5173/c/routes | 一覧。サンプル「四天王寺 南大門 → 天王寺公園 てんしば」が公開済みで入っている |
+| http://localhost:5173/r/7298a7dd6554 | 参加者画面。サンプルの写真列が 9 ステップ表示される |
+
+バックエンドに繋ぐときは `.env.local` に `VITE_API_MODE=server` を書く（`.env.example` 参照）。
 
 スマホからは、起動時に表示される `Network:` の URL を同じ Wi-Fi で開く。
 バックエンドの URL を変える場合は `.env.example` をコピーして `.env.local` を作る。
@@ -23,22 +32,27 @@ npm run dev
 
 ```
 src/
-├── main.tsx            # エントリ
-├── index.css           # 全体スタイル
-├── app/router.tsx      # ルーティング（/c → creator、/r/:id → follower）
+├── index.css           # Tailwind の読み込みと参加者画面の配色トークン
+├── app/
+│   ├── main.tsx        #   エントリ
+│   └── router.tsx      #   ルーティング（/c/* → creator、/r/:id → follower）
 ├── shared/             # 両者共通
-│   ├── api/            #   通信層: client.ts（fetch ラッパー）、endpoints.ts（予定）
-│   ├── types/          #   写真列 JSON などの型（backend/schemas と 1:1）
-│   └── components/     #   共用 UI（RoutePlanViewer など）
+│   ├── api/            #   通信層: endpoints.ts（入口）、fixtureApi.ts / serverApi.ts、client.ts
+│   ├── types/          #   写真列 JSON などの型（backend/app/schemas と 1:1）
+│   ├── fixtures/       #   バックエンドなしで動かすサンプル（sampleRoutePlan.json）
+│   ├── components/     #   共用 UI: RoutePlanViewer、StepView
+│   ├── hooks/          #   useAsync
+│   └── lib/            #   定数
 ├── creator/            # 作る人（/c/*）
-│   ├── pages/          #   hooks と components を繋ぐだけの薄いファイル
+│   ├── pages/          #   URL ごとの画面。hooks と components を繋ぐだけ
 │   ├── components/     #   UI 層: 見た目のみ
-│   └── hooks/          #   操作層: 状態・ブラウザ API・ポーリング
+│   ├── hooks/          #   操作層: 入力・撮影・ポーリング・一覧・公開
+│   └── storage/        #   localStorage の作成者 ID
 └── follower/           # 参加者（/r/:id）
-    ├── pages/
-    ├── components/     #   UI 層
-    ├── hooks/          #   操作層
-    └── logic/          #   位置判定の純関数
+    ├── pages/          #   NavigatePage
+    ├── components/     #   UI 層: NavigateHeader
+    ├── hooks/          #   操作層: useRoutePlan
+    └── logic/          #   位置判定の純関数（未着手）
 ```
 
 ## 3 層の分離

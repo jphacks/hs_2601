@@ -1,8 +1,14 @@
-import type { Photo } from '../types'
+import type { CapturedPhoto } from '../types'
 
 interface Props {
-  photos: Photo[]
-  onRemove: (photo: Photo) => void
+  photos: CapturedPhoto[]
+  onRemove: (photo: CapturedPhoto) => void
+}
+
+function locationLabel(photo: CapturedPhoto): string {
+  if (photo.lat !== undefined) return '位置情報取得済み'
+  if (photo.locationError) return `位置情報未取得（${photo.locationError}）`
+  return '位置情報を取得中...'
 }
 
 /** 作成画面の目印写真サムネイル一覧 */
@@ -26,9 +32,7 @@ export function PhotoGrid({ photos, onRemove }: Props) {
           />
           <div className="p-2">
             <p className="text-xs font-medium">目印 {index + 1}</p>
-            <p className="mt-1 text-xs text-stone-500">
-              {photo.lat !== undefined ? '位置情報取得済み' : '位置情報未取得'}
-            </p>
+            <p className="mt-1 text-xs text-stone-500">{locationLabel(photo)}</p>
             <button className="mt-2 text-sm text-red-600" onClick={() => onRemove(photo)}>
               削除
             </button>

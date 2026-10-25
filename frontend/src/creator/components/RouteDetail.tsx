@@ -1,42 +1,31 @@
-import type { Photo, Route } from '../types'
+import { RoutePlanViewer } from '../../shared/components/RoutePlanViewer'
+import type { RoutePlanRecord } from '../../shared/types/routePlan'
 import { buttonClass, secondaryClass } from './styles'
 
 interface Props {
-  route: Route
-  photos: Photo[]
+  record: RoutePlanRecord
   onPublish: () => void
   onEdit: () => void
 }
 
-/** 作成した道案内の確認画面 */
-export function RouteDetail({ route, photos, onPublish, onEdit }: Props) {
+/** 作成した道案内の確認画面。写真列は参加者画面と同じ RoutePlanViewer で描く */
+export function RouteDetail({ record, onPublish, onEdit }: Props) {
   return (
     <section className="space-y-5">
       <h1 className="text-2xl font-bold">道案内の確認</h1>
       <div className="rounded-2xl border bg-white p-4">
         <p className="text-sm text-stone-500">出発地</p>
-        <p className="font-semibold">{route.start}</p>
+        <p className="font-semibold">{record.origin}</p>
         <p className="my-2 text-emerald-700">↓</p>
         <p className="text-sm text-stone-500">目的地</p>
-        <p className="font-semibold">{route.goal}</p>
+        <p className="font-semibold">{record.destination}</p>
+        <p className="mt-2 text-xs text-stone-500">
+          {record.status === 'published' ? '公開済み' : '下書き'}
+        </p>
       </div>
-      <div className="space-y-3">
-        {photos.map((photo, i) => (
-          <div key={photo.id} className="overflow-hidden rounded-xl border bg-white">
-            <img
-              src={photo.preview}
-              alt={`経路の写真 ${i + 1}`}
-              className="h-52 w-full object-cover"
-            />
-            <div className="p-3">
-              <p className="font-semibold">目印 {i + 1}</p>
-              <p className="mt-1 text-sm text-stone-500">
-                曲がる方向・距離の案内は、経路 API の接続後に表示します。
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
+
+      <RoutePlanViewer plan={record.plan} />
+
       <button className={buttonClass} onClick={onPublish}>
         公開画面へ
       </button>

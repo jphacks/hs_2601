@@ -29,3 +29,6 @@ backend/out/
 
 # 外部 API のキャッシュ
 backend/.cache/
+
+# Supabase CLI の紐づけ情報（各自の環境）
+supabase/.temp/

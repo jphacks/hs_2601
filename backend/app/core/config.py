@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     vlm_model: str = "gemini-3.5-flash"  # claude なら "claude-haiku-4-5" など
     vlm_min_interval_s: float = 4.0  # 無料枠の 1 分あたり上限を超えないための呼び出し間隔
 
+    # Supabase（ステップ 9: 写真列の保存・公開）。service_role はサーバー専用で、フロントには渡さない
+    supabase_url: str | None = None  # 例: https://xxxx.supabase.co
+    supabase_service_role_key: str | None = None
+    supabase_anon_key: str | None = None  # 参加者フロントが直接読むときに使う（任意）
+    # 参加者向け URL の土台。公開時に {public_base_url}/r/{id} を表示する（任意）
+    public_base_url: str | None = None
+
     # 経路探索の出力先（scripts/explore_route.py の --out 既定値）
     out_dir: Path = BACKEND_DIR / "out"
     # 外部 API のレスポンスキャッシュ（同じ入力なら API を叩かない）
@@ -40,6 +47,15 @@ class Settings(BaseSettings):
                 "GOOGLE_MAPS_API_KEY が未設定です。backend/.env に書くか環境変数で渡してください。"
             )
         return self.google_maps_api_key
+
+    def require_supabase(self) -> tuple[str, str]:
+        """(url, service_role_key)。どちらか無ければエラー。"""
+        if not self.supabase_url or not self.supabase_service_role_key:
+            raise RuntimeError(
+                "SUPABASE_URL と SUPABASE_SERVICE_ROLE_KEY が未設定です。backend/.env に書いてください"
+                "（Supabase ダッシュボード Settings → API、または `supabase projects api-keys --reveal`）。"
+            )
+        return self.supabase_url.rstrip("/"), self.supabase_service_role_key
 
 
 @lru_cache

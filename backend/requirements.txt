@@ -5,3 +5,5 @@ pydantic-settings>=2.4
 httpx>=0.27
 polyline>=2.0
 Pillow>=10
+segno>=1.6
+zxing-cpp>=2.2    # QR の読み取り（テスト・確認用）
