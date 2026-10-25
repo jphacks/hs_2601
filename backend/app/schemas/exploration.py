@@ -41,6 +41,7 @@ class ArrowPoint(BaseModel):
 class VlmScore(BaseModel):
     on_walkway: bool = True  # 撮影地点に歩行者が立てるか。False（船上・階段・店内など）は採用しない
     path_blocked: bool = False  # 足元と進む先の路面の間に柵・段差・水面などがあり歩いて行けない。True は採用しない
+    road_ahead: bool = True  # 正面に今歩いている道が奥へ続いて見える。False（壁・建物・別の道を向く）は採用しない
     here: int = Field(ge=1, le=5)  # 現在地のわかりやすさ（今ここにいると確信できるか、目印を含む）
     arrow: int = Field(ge=1, le=5)  # 矢印の引きやすさ（どこを曲がるのかがはっきり見えるか）
     landmark_text: str = ""  # この画像での目印の短い説明

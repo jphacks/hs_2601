@@ -28,7 +28,7 @@ def main() -> None:
     e = Exploration.model_validate_json((d / "route.json").read_text(encoding="utf-8"))
     e2, stats = draw_arrows(e, d, args.source)
     (d / "route.json").write_text(e2.model_dump_json(indent=2), encoding="utf-8")
-    title = f"矢印: {e.origin.query} → {e.destination.query}（描画 {len(stats.drawn)}, うち投影 {len(stats.with_geo_path)} / VLM {len(stats.with_vlm_path)}, 画像なし {len(stats.skipped)}）"
+    title = f"矢印: {e.origin.query} → {e.destination.query}（描画 {len(stats.drawn)}, うち地図+画像 {len(stats.with_fused_path)} / 投影 {len(stats.with_geo_path)} / VLM {len(stats.with_vlm_path)}, 画像なし {len(stats.skipped)}）"
     (d / "contact.html").write_text(render_contact_html(e2, title), encoding="utf-8")
     (d / "map.html").write_text(build_map(e2, title), encoding="utf-8")
     print(title)

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from app.imaging.projection import Camera, in_frame, project_ground
 from app.schemas.exploration import ExplorationPoint, StreetViewMeta
-from app.services.creator.geo import LatLngT, cumulative_m, destination_point, nearest_vertex
+from app.services.creator.geo import LatLngT, cumulative_m, destination_point, nearest_vertex, point_at, project_to_path
 
 BEHIND_M = 60.0  # 曲がり角の何 m 手前から経路を辿るか
 AHEAD_M = 40.0  # 曲がった先を何 m まで描くか（遠すぎると消失点付近で点が固まる）
@@ -31,6 +31,17 @@ def camera_position(p: ExplorationPoint, sv: StreetViewMeta) -> LatLngT:
     heading = p.heading if p.heading is not None else 0.0
     direction = heading if p.maneuver.upper() == "DEPART" else (heading + 180.0) % 360.0
     return destination_point((p.lat, p.lng), direction, sv.offset_m)
+
+
+SNAP_M = 8.0  # 経路からこの距離以内のカメラは、経路の上に立っているとみなして寄せる
+
+
+def snapped_camera(path: list[LatLngT], p: ExplorationPoint, sv: StreetViewMeta) -> LatLngT:
+    """カメラ位置を経路線の上に寄せる。地図の経路線は道の中心から数 m ずれていることが多く、
+    そのまま投影すると矢印が足元から横にずれる。歩く向きの距離（どこで曲がるか）はそのまま保つ。"""
+    pos = camera_position(p, sv)
+    off, arc = project_to_path(path, pos)
+    return point_at(path, arc) if off <= SNAP_M else pos
 
 
 def resample(path: list[LatLngT], start_m: float, end_m: float, step_m: float = STEP_M) -> list[LatLngT]:
@@ -144,7 +155,7 @@ def geo_arrow_path(path: list[LatLngT], p: ExplorationPoint, sv: StreetViewMeta)
     """道なりの点列（正規化座標）。描けるだけの点が画像に入らなければ None。"""
     if len(path) < 2:
         return None
-    lat, lng = camera_position(p, sv)
+    lat, lng = snapped_camera(path, p, sv)
     cam = Camera(lat=lat, lng=lng, heading=sv.heading, fov=float(sv.fov), pitch=float(sv.pitch))
     window, corner = route_window(path, p)
     xys = [project_ground(cam, g) for g in window]
@@ -154,6 +165,16 @@ def geo_arrow_path(path: list[LatLngT], p: ExplorationPoint, sv: StreetViewMeta)
     start, pts = chosen
     entry = _entry(xys, start, pts[0])
     return simplify([entry, *pts] if entry else pts)
+
+
+def projected_corner(path: list[LatLngT], p: ExplorationPoint, sv: StreetViewMeta) -> XY | None:
+    """曲がる地点（この地点の座標）の画像内座標。枠外・後ろなら None。"""
+    if len(path) < 2:
+        return None
+    lat, lng = snapped_camera(path, p, sv)
+    cam = Camera(lat=lat, lng=lng, heading=sv.heading, fov=float(sv.fov), pitch=float(sv.pitch))
+    xy = project_ground(cam, (p.lat, p.lng))
+    return xy if xy is not None and in_frame(xy) else None
 
 
 START_X_RANGE = (0.25, 0.75)  # 歩行者の視点なら経路は画面下の中央寄りから始まる
@@ -182,7 +203,7 @@ def geo_visibility(path: list[LatLngT], p: ExplorationPoint, sv: StreetViewMeta)
     official = is_official(sv)
     if len(path) < 2:
         return GeoVisibility(False, False, False, 0, official)
-    lat, lng = camera_position(p, sv)
+    lat, lng = snapped_camera(path, p, sv)
     cam = Camera(lat=lat, lng=lng, heading=sv.heading, fov=float(sv.fov), pitch=float(sv.pitch))
     window, corner = route_window(path, p)
     best = choose_run(visible_runs([project_ground(cam, g) for g in window]), corner)

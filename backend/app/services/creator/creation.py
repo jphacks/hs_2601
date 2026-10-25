@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -56,7 +57,9 @@ def failure_message(err: Exception, step: JobStep | None) -> str:
 
 
 def run_creation_job(job: CreationJob, store: JobStore, pipeline: PipelineRunner,
-                     repo: RoutePlanRepository, storage: PhotoStorage) -> None:
+                     repo: RoutePlanRepository, storage: PhotoStorage,
+                     after_done: Callable[[Path], object] | None = None) -> None:
+    """after_done は完了を知らせた後に作業ディレクトリで呼ぶ（map.png など、待たせたくない後処理）。"""
     def on_step(step: JobStep) -> None:
         store.update(job.job_id, step=step)
 
@@ -75,3 +78,8 @@ def run_creation_job(job: CreationJob, store: JobStore, pipeline: PipelineRunner
         store.update(job.job_id, state="failed", message=failure_message(err, step))
         return
     store.update(job.job_id, state="done")
+    if after_done is not None:
+        try:
+            after_done(job.work_dir)
+        except Exception:  # noqa: BLE001 後処理の失敗で道案内の作成を失敗にしない
+            log.exception("job %s: 後処理に失敗しました", job.job_id)

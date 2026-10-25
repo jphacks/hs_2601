@@ -28,6 +28,7 @@ from app.schemas.creator_api import CreateRouteResponse, JobStatus, PublishRespo
 from app.schemas.creator_input import PlanInput
 from app.schemas.route_plan import RoutePlanRecord, plan_id_for, validate_plan_id
 from app.services.creator.creation import CreationJob, PipelineRunner, run_creation_job
+from app.services.creator.snapshot import write_map_png
 from app.services.creator.intake import (
     MAX_PHOTO_BYTES, UploadedPhoto, match_photos, normalize_photos, parse_manifest, write_work_dir,
 )
@@ -95,7 +96,8 @@ def create_route(
         raise HTTPException(409, "同じ名前の道案内を作成中です。終わるまで待ってください。")
     work_dir = work_root / route_id
     write_work_dir(plan, normalized, work_dir)
-    background.add_task(run_creation_job, CreationJob(job.job_id, route_id, plan, work_dir), store, pipeline, repo, storage)
+    background.add_task(run_creation_job, CreationJob(job.job_id, route_id, plan, work_dir), store, pipeline, repo, storage,
+                        after_done=write_map_png)  # 完了を知らせてから map.png を作る
     return CreateRouteResponse(job_id=job.job_id, route_id=route_id)
 
 

@@ -180,7 +180,7 @@ def enrich(c: PipelineClients, e: Exploration, out_dir: Path, opt: StreetViewOpt
 
     rep.on_step("arrow")
     e, a = draw_arrows(e, out_dir)
-    rep.log(f"[7/7] arrow: 描画 {len(a.drawn)}（投影 {len(a.with_geo_path)} / VLM {len(a.with_vlm_path)}）"
+    rep.log(f"[7/7] arrow: 描画 {len(a.drawn)}（地図+画像 {len(a.with_fused_path)} / 地図の投影 {len(a.with_geo_path)} / VLM のみ {len(a.with_vlm_path)}）"
             f"/ 画像なし {len(a.skipped)} / 作成者写真 {len(a.creator)}")
     return e
 

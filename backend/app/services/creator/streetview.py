@@ -213,9 +213,12 @@ ON_ROUTE_M = 8.0  # パノラマの撮影位置が経路からこれ以上離れ
 PAST_CORNER_M = 2.0  # 曲がり角をこれ以上越えた位置のパノラマは使わない
 SEARCH_RADIUS_M = 15  # Metadata API の探索半径。大きいと別の道のパノラマを拾う
 # 曲がり角・到着点の何 m 手前から撮るか（上から順に試す）。近すぎると曲がる先が枠外になる
-TRAVEL_BEFORE_M: tuple[float, ...] = (10.0, 15.0, 20.0, 6.0, 25.0, 30.0, 3.0, 40.0, 50.0, 60.0)
+TRAVEL_BEFORE_M: tuple[float, ...] = (10.0, 15.0, 20.0, 25.0, 6.0, 30.0, 40.0)
 # 出発点は前方へ進みながら撮る
-TRAVEL_AFTER_START_M: tuple[float, ...] = (0.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0)
+TRAVEL_AFTER_START_M: tuple[float, ...] = (0.0, 10.0, 20.0, 30.0)
+# 進行方向の候補は 1 地点 4 枚まで。VLM の評価時間は枚数にほぼ比例するので、旧方式（8 枚）より絞る
+TRAVEL_TARGET = 4
+TRAVEL_SPARE = 2  # 公式撮影を優先して選ぶため、target より少し多めに集めて打ち切る
 
 
 @dataclass(frozen=True)
@@ -234,7 +237,7 @@ def travel_shots(client: StreetViewClient, p: ExplorationPoint, route: list[LatL
     shots: list[TravelShot] = []
     seen: set[str] = set()
     for arc in arcs:
-        if arc < 0 or len(shots) >= target * 2:
+        if arc < 0 or len(shots) >= target + TRAVEL_SPARE:
             continue
         lat, lng = point_at(route, arc)
         meta = client.metadata(lat, lng, radius_m=SEARCH_RADIUS_M)
@@ -265,7 +268,7 @@ def _fetch_image(client: StreetViewClient, pano_id: str, heading: float, opt: St
 
 def fetch_travel_candidates(
     client: StreetViewClient, p: ExplorationPoint, out_dir: Path, base: StreetViewOptions, route: list[LatLngT],
-    cache: FileCache | None = None, target: int = TARGET_CANDIDATES,
+    cache: FileCache | None = None, target: int = TRAVEL_TARGET,
 ) -> ExplorationPoint:
     """進行方向の候補だけを取る（向きは回さない）。画角・ピッチは base のまま。"""
     opt = StreetViewOptions(**{**base.__dict__, "fov": 90, "pitch": 0})

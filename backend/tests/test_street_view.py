@@ -238,7 +238,7 @@ def test_経路があれば進行方向だけを向き_角より手前から撮�
     from app.services.creator.streetview import TRAVEL_MODE, fetch_candidates
     e2, _ = fetch_candidates(_client(lambda lat, lng: (lat, lng)), _turn_exploration(), tmp_path)
     cands = e2.points[0].candidates
-    assert len(cands) == 8
+    assert len(cands) == 4  # 進行方向の候補は 4 枚まで（VLM の時間を抑える）
     assert all(c.heading_mode == TRAVEL_MODE for c in cands)
     assert all(abs(c.street_view.heading - 90.0) < 1.0 for c in cands)  # 曲がる先（北）へ回さない
     assert all(c.street_view.offset_m > 0 for c in cands)  # 角より手前

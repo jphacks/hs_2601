@@ -114,9 +114,9 @@ def test_カメラの脇を通る経路は枠の縁から線を始める() -> No
     assert clip_to_frame((1.5, 1.5), (0.5, 0.5)) == pytest.approx((1.0, 1.0))  # 角から入る
     assert clip_to_frame((1.3, 1.1), (0.5, 0.7)) == pytest.approx((1.0, 0.95))  # 右端から入る（遅い方の交点）
     corner = destination_point(CAM, 0.0, 25.0)
-    # 経路はカメラの 4 m 右を通る（カメラは歩道側に立っている）
-    side = destination_point(CAM, 90.0, 4.0)
-    path = [destination_point(side, 180.0, 40.0), destination_point(corner, 90.0, 4.0), destination_point(corner, 270.0, 40.0)]
+    # 経路はカメラの 12 m 右を通る（寄せる距離 SNAP_M より遠い = 経路の上に立っていない）
+    side = destination_point(CAM, 90.0, 12.0)
+    path = [destination_point(side, 180.0, 40.0), destination_point(corner, 90.0, 12.0), destination_point(corner, 270.0, 40.0)]
     sv = StreetViewMeta(pano_id="P", heading=0.0, fov=90, lat=CAM[0], lng=CAM[1])
     pts = geo_arrow_path(path, point("left", 0.0, 270.0, corner), sv)
     assert pts
@@ -148,3 +148,16 @@ def test_候補選定は公式撮影を優先する() -> None:
     cands = [ImageCandidate(image="u", heading_mode="approach", street_view=user, score=VlmScore(here=5, arrow=5)),
              ImageCandidate(image="g", heading_mode="approach", street_view=official, score=VlmScore(here=3, arrow=3))]
     assert choose_best(cands, 0, p, path) == 1
+
+
+def test_経路の数m脇に立つカメラは経路の上に寄せて足元から線を引く() -> None:
+    from app.services.creator.arrow_geo import geo_arrow_path
+    corner = destination_point(CAM, 0.0, 25.0)
+    side = destination_point(CAM, 90.0, 4.0)  # 地図の経路線が 4 m 右にずれている
+    path = [destination_point(side, 180.0, 40.0), destination_point(corner, 90.0, 4.0), destination_point(corner, 270.0, 40.0)]
+    sv = StreetViewMeta(pano_id="P", heading=0.0, fov=90, lat=CAM[0], lng=CAM[1])
+    pts = geo_arrow_path(path, point("left", 0.0, 270.0, corner), sv)
+    assert pts
+    x0, y0 = pts[0]
+    assert y0 >= 0.9 and abs(x0 - 0.5) < 0.05  # 足元の中央から始まる
+    assert pts[-1][0] < 0.3  # 左折なので左へ抜ける

@@ -5,9 +5,8 @@
 """
 from __future__ import annotations
 
-from app.imaging.projection import Camera, in_frame, project_ground
 from app.schemas.exploration import ExplorationPoint, ImageCandidate, StreetViewMeta
-from app.services.creator.arrow_geo import camera_position, geo_arrow_path, is_official
+from app.services.creator.arrow_geo import camera_position, geo_arrow_path, is_official, projected_corner
 from app.services.creator.geo import LatLngT, bearing_deg, cumulative_m, haversine_m, heading_diff_deg, nearest_vertex
 
 COMPASS = ("北", "北東", "東", "南東", "南", "南西", "西", "北西")
@@ -97,19 +96,18 @@ def _position_desc(p: ExplorationPoint, sv: StreetViewMeta, cam: LatLngT) -> str
 def _projection_desc(p: ExplorationPoint, sv: StreetViewMeta, cam: LatLngT, route: list[LatLngT] | None) -> list[str]:
     if not route or len(route) < 2:
         return []
-    camera = Camera(lat=cam[0], lng=cam[1], heading=sv.heading, fov=float(sv.fov), pitch=float(sv.pitch))
-    corner = project_ground(camera, (p.lat, p.lng))
+    corner = projected_corner(route, p, sv)
     lines = []
-    if corner is not None and in_frame(corner):
-        lines.append(f"    - 曲がる地点の画像内座標: ({corner[0]:.2f}, {corner[1]:.2f})")
+    if corner is not None:
+        lines.append(f"    - 曲がる地点の画像内座標（画像の水色の丸）: ({corner[0]:.2f}, {corner[1]:.2f})")
     else:
         lines.append("    - 曲がる地点は画像の枠外（または後ろ）")
     path = geo_arrow_path(route, p, sv)
     if path:
         pts = " → ".join(f"({x:.2f}, {y:.2f})" for x, y in path)
-        lines.append(f"    - 経路の投影線（歩行者が通る路面の中心線を画像座標に写したもの）: {pts}")
+        lines.append(f"    - 案内線（地図の経路を画像に写したもの。画像に水色の線で描いてある）: {pts}")
     else:
-        lines.append("    - 経路の投影線: この画像には歩く向きの経路が映らない")
+        lines.append("    - 案内線: この画像には歩く向きの経路が映らない")
     return lines
 
 

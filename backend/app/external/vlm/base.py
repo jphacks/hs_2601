@@ -21,6 +21,7 @@ class CandidateEvaluation:
     landmark_text: str
     reason: str
     arrow_path: list[tuple[float, float]]  # 0〜1 の正規化座標
+    road_ahead: bool = True  # 正面に今歩いている道の路面が手前から奥へ続いて見える（壁・建物・別の道を向いていない）
 
 
 @dataclass(frozen=True)
@@ -66,11 +67,13 @@ def parse_evaluation(text: str, n_images: int) -> Evaluation:
             landmark_text=str(item.get("landmark", "")).strip(),
             reason=str(item.get("reason", "")).strip(),
             arrow_path=path,
+            road_ahead=_as_bool(item.get("road_ahead", True)),
         ))
     if not evals:
         raise VlmError(f"VLM の返答に評価が含まれていません: {text[:200]}")
     best = int(body.get("best_index", -1))
-    walkable = [e for e in evals if e.on_walkway and not e.path_blocked] or evals  # 使える候補が無ければ全体から選ぶ
+    walkable = ([e for e in evals if e.on_walkway and not e.path_blocked and e.road_ahead]
+                or [e for e in evals if e.on_walkway and not e.path_blocked] or evals)  # 使える候補が無ければ全体から選ぶ
     allowed = {e.index for e in walkable}
     if best not in allowed:  # 範囲外、または立てない候補を選んでいたら選び直す
         best = max(walkable, key=lambda e: (e.here + e.arrow, e.arrow)).index

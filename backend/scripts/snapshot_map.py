@@ -11,29 +11,10 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import subprocess
 from pathlib import Path
 
 from app.core.config import get_settings
-
-SIZES = {"map": "1200,900", "contact": "1400,2000"}
-
-
-def snapshot(out_dir: Path, name: str, size: str | None = None) -> Path | None:
-    """out_dir/<name>.html → out_dir/<name>.png。失敗や Firefox 無しなら None。"""
-    out_dir = out_dir.resolve()  # file URI には絶対パスが要る
-    html = out_dir / f"{name}.html"
-    png = out_dir / f"{name}.png"
-    firefox = shutil.which("firefox")
-    if not html.exists() or not firefox:
-        return None
-    png.unlink(missing_ok=True)  # snap 版 Firefox は /tmp に書けないので out/ 直下に出す
-    subprocess.run(
-        [firefox, "--headless", f"--window-size={size or SIZES.get(name, '1200,900')}", "--screenshot", str(png), html.as_uri()],
-        check=False, capture_output=True, timeout=180,
-    )
-    return png if png.exists() else None
-
+from app.services.creator.snapshot import SIZES, snapshot  # noqa: F401  （scripts から使う名前を残す）
 
 def write_snapshots(out_dir: Path, names: tuple[str, ...] = ("map", "contact")) -> dict[str, Path | None]:
     """html を書き換えた直後に呼び、同名の PNG も更新する。Firefox が無ければ案内だけ出して何もしない。"""

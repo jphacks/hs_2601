@@ -44,8 +44,8 @@ def test_候補ごとに撮影位置_向き_投影線が入る() -> None:
     assert "画像 0: 撮影位置" in text and "交差点の 25 m 手前" in text
     assert "カメラの向き: 0°（北）、進入方位から見て ほぼ同じ向き、水平画角 90°、ピッチ 0°" in text
     assert "Google 公式、2024-05" in text and "ユーザー投稿" in text
-    assert "曲がる地点の画像内座標: (0.50, 0.55)" in text
-    assert "経路の投影線（歩行者が通る路面の中心線を画像座標に写したもの）: (0.50, 0.92)" in text
+    assert "曲がる地点の画像内座標（画像の水色の丸）: (0.50, 0.55)" in text
+    assert "案内線（地図の経路を画像に写したもの。画像に水色の線で描いてある）: (0.50, 0.92)" in text
     assert "曲がった先の道路に 8 m 入った位置" in text and "進入方位から見て 左 90°" in text
     assert "後ろ向き" in text and "この画像には歩く向きの経路が映らない" in text
 
@@ -54,7 +54,7 @@ def test_プロンプトに経路情報と画像情報が埋まる() -> None:
     sv = StreetViewMeta(pano_id="A", heading=0.0, fov=90, lat=CAM[0], lng=CAM[1])
     p = point().model_copy(update={"candidates": [ImageCandidate(image="a", heading_mode="approach", street_view=sv)]})
     prompt = build_prompt(p, 1, route=PATH)
-    assert "## 経路情報" in prompt and "退出方位" in prompt and "画像 0: 撮影位置" in prompt and "経路の投影線" in prompt
+    assert "## 経路情報" in prompt and "退出方位" in prompt and "画像 0: 撮影位置" in prompt and "案内線" in prompt
     assert "{route_info}" not in prompt and "{images_info}" not in prompt
     assert '{"evaluations"' in prompt  # 出力例の波括弧がそのまま残る
     # 経路が無くても組み立てられる（候補の位置・向きだけ入る）

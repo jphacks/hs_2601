@@ -29,9 +29,9 @@ def render_contact_html(e: Exploration, title: str) -> str:
             for i, c in enumerate(p.candidates):
                 chosen = " chosen" if p.chosen_candidate == i else ""
                 sc = c.score
-                if sc and (not sc.on_walkway or sc.path_blocked):
+                if sc and (not sc.on_walkway or sc.path_blocked or not sc.road_ahead):
                     chosen += " rejected"
-                    why = "立てない" if not sc.on_walkway else "進めない"
+                    why = "立てない" if not sc.on_walkway else "進めない" if sc.path_blocked else "正面に道なし"
                     label = f"{why} / 現在地 {sc.here} / 矢印 {sc.arrow}"
                 else:
                     label = f"現在地 {sc.here} / 矢印 {sc.arrow}" if sc else "未評価"
