@@ -19,6 +19,8 @@ export interface PhotoInput {
   accuracyM?: number
   /** 撮影時刻（ISO 8601） */
   takenAt?: string
+  /** 作成者のメッセージ（目印文に使われる）。無ければ null */
+  caption?: string | null
 }
 
 export interface CreateRouteInput {

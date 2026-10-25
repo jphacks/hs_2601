@@ -38,7 +38,10 @@ export function validateDraft({ name, origin, destination, photos }: DraftInput)
   return null
 }
 
-/** 写真を 1 枚ずつ JPEG にする（スマホのメモリを考えて並列にしない）。失敗したらどの写真かを添えて投げる */
+/**
+ * 写真を 1 枚ずつ JPEG にする（スマホのメモリを考えて並列にしない）。失敗したらどの写真かを添えて投げる。
+ * 描画済みの写真は annotate モジュールが JPEG（長辺 1280px 以下）にしているので、変換せずそのまま使う。
+ */
 export async function convertPhotos(
   photos: CapturedPhoto[],
   convert: (file: File) => Promise<Blob>,
@@ -46,7 +49,7 @@ export async function convertPhotos(
   const jpegs: Blob[] = []
   for (const [i, photo] of photos.entries()) {
     try {
-      jpegs.push(await convert(photo.file))
+      jpegs.push(photo.annotated ?? (await convert(photo.file)))
     } catch {
       throw new Error(
         `目印 ${i + 1} の写真を読み込めませんでした。別の形式で撮り直すか、写真を削除してください`,
@@ -80,6 +83,7 @@ export function buildCreateInput(
         lng: location.lng,
         accuracyM: location.accuracyM,
         takenAt: photo.takenAt,
+        caption: photo.caption ?? null,
       }
     }),
   }

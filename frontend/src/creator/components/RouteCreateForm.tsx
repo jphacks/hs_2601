@@ -18,6 +18,7 @@ interface Props {
   onAddPhotos: (files: FileList | null) => void
   onRemovePhoto: (photo: CapturedPhoto) => void
   onRetryLocation: (photo: CapturedPhoto) => void
+  onAnnotatePhoto: (photo: CapturedPhoto) => void
   onSubmit: () => void
   onCancel: () => void
 }
@@ -42,6 +43,7 @@ export function RouteCreateForm({
   onAddPhotos,
   onRemovePhoto,
   onRetryLocation,
+  onAnnotatePhoto,
   onSubmit,
   onCancel,
 }: Props) {
@@ -110,7 +112,12 @@ export function RouteCreateForm({
           📷 写真を撮る・追加する
         </button>
 
-        <PhotoGrid photos={photos} onRemove={onRemovePhoto} onRetryLocation={onRetryLocation} />
+        <PhotoGrid
+          photos={photos}
+          onRemove={onRemovePhoto}
+          onRetryLocation={onRetryLocation}
+          onAnnotate={onAnnotatePhoto}
+        />
       </div>
 
       {error && (

@@ -83,6 +83,15 @@ export function useCapture() {
     [attachLocation],
   )
 
+  /** 描画・メッセージの結果を反映する。サムネイルは描画後の画像に差し替え、古い Object URL は解放する */
+  const annotatePhoto = useCallback((photoId: string, result: { blob: Blob; caption: string | null }) => {
+    const preview = URL.createObjectURL(result.blob)
+    setPhotos((old) => {
+      old.filter((p) => p.id === photoId).forEach((p) => URL.revokeObjectURL(p.preview))
+      return updatePhoto(old, photoId, { annotated: result.blob, caption: result.caption, preview })
+    })
+  }, [])
+
   const removePhoto = useCallback((photo: CapturedPhoto) => {
     URL.revokeObjectURL(photo.preview)
     setPhotos((old) => old.filter((p) => p.id !== photo.id))
@@ -95,5 +104,5 @@ export function useCapture() {
     })
   }, [])
 
-  return { photos, addPhotos, removePhoto, retryLocation, clearPhotos }
+  return { photos, addPhotos, removePhoto, retryLocation, annotatePhoto, clearPhotos }
 }

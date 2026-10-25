@@ -15,6 +15,10 @@ export interface CapturedPhoto {
   accuracyM?: number
   /** 位置情報が取れなかったときの理由 */
   locationError?: string
+  /** 描画を焼き込んだ JPEG（annotate モジュールの出力）。あれば file の代わりに送る */
+  annotated?: Blob
+  /** 作成者のメッセージ。manifest の photos[].caption になり、その地点の目印文に使われる */
+  caption?: string | null
 }
 
 /** 写真 1 枚の位置情報の状態 */

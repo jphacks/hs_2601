@@ -53,6 +53,11 @@ describe('buildPlanManifest', () => {
     })
   })
 
+  it('写真のメッセージは photos[].caption に入る', () => {
+    const withCaption = { ...input, photos: [{ ...input.photos[0], caption: '赤い看板を右へ' }] }
+    expect(buildPlanManifest(withCaption, 'unused').photos[0].caption).toBe('赤い看板を右へ')
+  })
+
   it('createdAt が無ければ fallback を使う。写真 0 枚も作れる', () => {
     const manifest = buildPlanManifest({ ...input, createdAt: undefined, photos: [] }, '2026-01-01T00:00:00+09:00')
     expect(manifest.created_at).toBe('2026-01-01T00:00:00+09:00')

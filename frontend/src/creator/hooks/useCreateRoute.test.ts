@@ -87,7 +87,7 @@ describe('buildCreateInput', () => {
       creatorId: 'c1',
       createdAt: '2026-10-25T10:12:00+09:00',
       photos: [
-        { id: 'p1', file: jpeg, lat: 34.6, lng: 135.5, accuracyM: 8, takenAt: '2026-10-25T10:05:31+09:00' },
+        { id: 'p1', file: jpeg, lat: 34.6, lng: 135.5, accuracyM: 8, takenAt: '2026-10-25T10:05:31+09:00', caption: null },
       ],
     })
   })
@@ -96,5 +96,29 @@ describe('buildCreateInput', () => {
     const noLocation = draft({ photos: [photo('p1', { lat: undefined, lng: undefined })] })
     expect(() => buildCreateInput(noLocation, [jpeg], 'c1', 'x')).toThrow('目印 1 の位置情報がありません')
     expect(() => buildCreateInput(draft(), [], 'c1', 'x')).toThrow()
+  })
+})
+
+describe('描画・メッセージ', () => {
+  it('描画済みの写真は変換せずその JPEG を送り、未描画だけ変換する', async () => {
+    const annotated = new Blob(['drawn'], { type: 'image/jpeg' })
+    const converted: string[] = []
+    const jpegs = await convertPhotos([photo('p1', { annotated }), photo('p2')], async (file) => {
+      converted.push(file.name)
+      return new Blob(['conv'], { type: 'image/jpeg' })
+    })
+    expect(jpegs[0]).toBe(annotated)
+    expect(converted).toEqual(['p2.heic'])
+  })
+
+  it('メッセージは caption として送る入力に載る。無ければ null', () => {
+    const blobs = [new Blob(['a']), new Blob(['b'])]
+    const input = buildCreateInput(
+      draft({ photos: [photo('p1', { caption: '赤い看板を右へ' }), photo('p2')] }),
+      blobs,
+      'c_1',
+      '2026-10-25T10:12:00+09:00',
+    )
+    expect(input.photos.map((p) => p.caption)).toEqual(['赤い看板を右へ', null])
   })
 })

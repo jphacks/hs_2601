@@ -23,7 +23,7 @@ function toManifestPhoto(photo: PhotoInput, seq: number): PlanInputPhoto {
     accuracy_m: photo.accuracyM ?? null,
     taken_at: photo.takenAt ?? null,
     location_source: 'gps',
-    caption: null,
+    caption: photo.caption ?? null,
   }
 }
 
