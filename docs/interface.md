@@ -105,7 +105,8 @@ GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>
 | フィールド | 必須 | 内容 |
 |---|---|---|
 | `name` | ○ | 命名。保存キー（ID はこのハッシュ） |
-| `origin`, `destination` | ○ | 地名の文字列、または `{query, lat, lng}`（現在地から、など） |
+| `origin` | ○ | 地名の文字列、または `{query, lat, lng}`（現在地から、など） |
+| `destination` | 任意 | `origin` と同じ形。省略・`null`・空文字なら**最後の写真がゴール**（会場の写真で終わる道）。このとき写真は 1 枚以上必要 |
 | `creator_id` | 任意 | localStorage のランダム ID。一覧の絞り込み用 |
 | `photos[].id` | ○ | フロントの `crypto.randomUUID()` など。英数字・`-`・`_` |
 | `photos[].seq` | ○ | 撮影順。0 から連続で配列順と一致。経路はこの順に通る（順序の最適化はしない） |
@@ -121,7 +122,7 @@ GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>
   ファイル名は `<id>.jpg` に付け替えて送り、バックエンドは `photos[].image` と突き合わせる。
 - バックエンドは受信時に EXIF の回転を適用し長辺 1280px に縮小して `photos/<id>.jpg` に置き、`manifest` を `photos.json` として保存する。
   以降の処理はこのディレクトリだけを見る。HEIC など開けない形式は受け付けない。
-- 経路は「出発地 → 写真 1 → … → 写真 n → 目的地」を区間ごとに計算して結合する。写真地点は `image_source = "creator_photo"` として写真列に入り、矢印は描かれない。
+- 経路は「出発地 → 写真 1 → … → 写真 n → 目的地」を区間ごとに計算して結合する。目的地を省略したときは写真 n で終わり、最後のステップは写真 n（`turn = "arrive"`）。`RoutePlan.destination` は写真 n の `caption`、無ければ「最後の写真の地点」。写真地点は `image_source = "creator_photo"` として写真列に入り、矢印は描かれない。
 
 ## 5. 作る人の HTTP API（フロント ⇄ FastAPI）
 

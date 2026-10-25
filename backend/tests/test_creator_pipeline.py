@@ -52,3 +52,17 @@ def test_VLMが作れなくてもフォールバック文で続ける(tmp_path: 
     r = PhotoPipeline(make_clients=lambda: clients(no_vlm)).run(plan, tmp_path, Reporter(log=lines.append))
     assert any("VLM なし（キーなし）" in line for line in lines)
     assert all(p.landmark for p in r.exploration.points)
+
+
+def test_目的地を省略すると最後の写真がゴールになる(tmp_path: Path) -> None:
+    write_input(tmp_path)
+    data = json.loads((tmp_path / "photos.json").read_text(encoding="utf-8"))
+    data.pop("destination")
+    plan = PlanInput.model_validate(data)
+    lines: list[str] = []
+    r = PhotoPipeline(make_clients=lambda: clients(None)).run(plan, tmp_path, Reporter(log=lines.append))
+    last = r.exploration.points[-1]
+    assert last.turn == "arrive" and last.creator_photo and last.creator_photo.id == plan.photos[-1].id
+    assert last.image_source == "creator_photo" and last.arrow_image is None  # 写真のまま、矢印なし
+    assert (r.destination.lat, r.destination.lng) == (plan.photos[-1].lat, plan.photos[-1].lng)
+    assert "最後の写真がゴール" in lines[0]

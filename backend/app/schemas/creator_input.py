@@ -49,7 +49,7 @@ class PlanInput(BaseModel):
     version: Literal[1] = 1
     name: str = Field(min_length=1)  # 命名（保存キー）
     origin: PlaceInput
-    destination: PlaceInput
+    destination: PlaceInput | None = None  # 省略すると最後の写真をゴールにする（会場の写真で終わる道）
     creator_id: str | None = None
     created_at: str | None = None
     photos: list[CreatorPhoto] = Field(default_factory=list)
@@ -63,7 +63,7 @@ class PlanInput(BaseModel):
             data = dict(data)
             for k in ("origin", "destination"):
                 if isinstance(data.get(k), str):
-                    data[k] = {"query": data[k]}
+                    data[k] = {"query": data[k]} if data[k].strip() else None  # 空文字の目的地は省略と同じ
         return data
 
     @model_validator(mode="after")
@@ -76,4 +76,19 @@ class PlanInput(BaseModel):
             raise ValueError("photos[].id が重複している")
         if self.name.strip() == "":
             raise ValueError("name が空")
+        if self.destination is None and not self.photos:
+            raise ValueError("目的地を省略するときは写真が 1 枚以上必要（最後の写真がゴールになる）")
         return self
+
+    @property
+    def ends_at_last_photo(self) -> bool:
+        """目的地が無く、最後の写真がゴール。"""
+        return self.destination is None
+
+
+GOAL_PHOTO_LABEL = "最後の写真の地点"
+
+
+def goal_from_last_photo(photo: CreatorPhoto) -> PlaceInput:
+    """目的地を省略したときのゴール。名前はメッセージがあればそれ。"""
+    return PlaceInput(query=photo.caption or GOAL_PHOTO_LABEL, lat=photo.lat, lng=photo.lng)

@@ -24,9 +24,10 @@ describe('validateDraft', () => {
     expect(validateDraft(draft({ name: '  ' }))).toBe('道の名前を入力してください')
   })
 
-  it('出発地か目的地が空白だけならエラー', () => {
-    expect(validateDraft(draft({ origin: ' ' }))).toBe('出発地と目的地を入力してください')
-    expect(validateDraft(draft({ destination: '' }))).toBe('出発地と目的地を入力してください')
+  it('出発地が空白だけならエラー。目的地は空でもよい（最後の写真がゴール）', () => {
+    expect(validateDraft(draft({ origin: ' ' }))).toBe('出発地を入力してください')
+    expect(validateDraft(draft({ destination: '' }))).toBeNull()
+    expect(validateDraft(draft({ destination: '', photos: [] }))).toBe('目印となる写真を撮影してください')
   })
 
   it('写真がなければエラー', () => {

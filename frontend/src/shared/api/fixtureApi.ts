@@ -4,7 +4,7 @@
  * 本物の API は serverApi.ts。endpoints.ts の切り替え（VITE_API_MODE）で差し替える。
  */
 import samplePlanJson from '../fixtures/sampleRoutePlan.json'
-import { FIXTURE_CREATE_DELAY_MS, JOB_STEPS } from '../lib/constants'
+import { FIXTURE_CREATE_DELAY_MS, JOB_STEPS, GOAL_PHOTO_LABEL } from '../lib/constants'
 import { toIsoWithOffset } from '../lib/datetime'
 import type { CreateRouteInput, JobStep, RouteSummary } from '../types/creator'
 import type { RoutePlan, RoutePlanRecord } from '../types/routePlan'
@@ -99,9 +99,15 @@ function stepAt(elapsedMs: number, totalMs: number): JobStep {
   return JOB_STEPS[index]
 }
 
+/** 目的地の表示名。省略時はバックエンドと同じく最後の写真のメッセージか既定の呼び名 */
+function goalLabel(input: CreateRouteInput): string {
+  const last = input.photos[input.photos.length - 1]
+  return input.destination.trim() || last?.caption || GOAL_PHOTO_LABEL
+}
+
 /** 入力の出発地・目的地だけを差し替えた写真列を作る。ステップは fixture のまま */
 function planFor(input: CreateRouteInput): RoutePlan {
-  return { ...samplePlan, origin: input.origin, destination: input.destination }
+  return { ...samplePlan, origin: input.origin, destination: goalLabel(input) }
 }
 
 export function createFixtureApi(options: FixtureApiOptions = {}): RouteApi {
@@ -127,7 +133,7 @@ export function createFixtureApi(options: FixtureApiOptions = {}): RouteApi {
       name: job.input.name.trim(),
       status: 'draft',
       origin: job.input.origin,
-      destination: job.input.destination,
+      destination: goalLabel(job.input),
       plan: planFor(job.input),
     }
     const stored: StoredRecord = {

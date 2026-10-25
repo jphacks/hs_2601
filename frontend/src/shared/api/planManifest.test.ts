@@ -53,6 +53,10 @@ describe('buildPlanManifest', () => {
     })
   })
 
+  it('目的地が空白だけなら null（最後の写真がゴール）', () => {
+    expect(buildPlanManifest({ ...input, destination: '  ' }, 'unused').destination).toBeNull()
+  })
+
   it('写真のメッセージは photos[].caption に入る', () => {
     const withCaption = { ...input, photos: [{ ...input.photos[0], caption: '赤い看板を右へ' }] }
     expect(buildPlanManifest(withCaption, 'unused').photos[0].caption).toBe('赤い看板を右へ')

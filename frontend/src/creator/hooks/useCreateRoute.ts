@@ -26,9 +26,10 @@ function photoNumbers(photos: CapturedPhoto[], pick: (p: CapturedPhoto) => boole
 }
 
 /** 入力を検証し、問題があればエラー文を返す。なければ null */
-export function validateDraft({ name, origin, destination, photos }: DraftInput): string | null {
+export function validateDraft({ name, origin, photos }: DraftInput): string | null {
   if (!name.trim()) return '道の名前を入力してください'
-  if (!origin.trim() || !destination.trim()) return '出発地と目的地を入力してください'
+  // 目的地は任意。空なら最後の写真がゴールになる（写真は下で 1 枚以上を必須にしている）
+  if (!origin.trim()) return '出発地を入力してください'
   if (photos.length === 0) return '目印となる写真を撮影してください'
 
   const failed = photoNumbers(photos, (p) => photoLocationStatus(p).kind === 'failed')

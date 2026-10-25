@@ -53,8 +53,13 @@ def photo_place(photo: CreatorPhoto) -> Place:
     return Place(query=f"写真 {photo.seq}", lat=photo.lat, lng=photo.lng)
 
 
-def split_legs(origin: Place, destination: Place, photos: list[CreatorPhoto]) -> list[Leg]:
-    stops: list[tuple[Place, CreatorPhoto | None]] = [(origin, None), *((photo_place(p), p) for p in photos), (destination, None)]
+def split_legs(origin: Place, destination: Place | None, photos: list[CreatorPhoto]) -> list[Leg]:
+    """destination が None なら最後の写真で終わる（最後の区間の終点が写真になる）。"""
+    if destination is None and not photos:
+        raise ValueError("目的地も写真も無い")
+    stops: list[tuple[Place, CreatorPhoto | None]] = [(origin, None), *((photo_place(p), p) for p in photos)]
+    if destination is not None:
+        stops.append((destination, None))
     return [Leg(i, stops[i][0], stops[i + 1][0], stops[i + 1][1]) for i in range(len(stops) - 1)]
 
 
@@ -81,6 +86,18 @@ def _photo_point(photo: CreatorPhoto, arrive: ExplorationPoint, depart: Explorat
         index=0, lat=depart.lat, lng=depart.lng, heading=h_in, heading_out=h_out,
         maneuver="CREATOR_PHOTO", turn=classify_turn("CREATOR_PHOTO", delta),
         instruction=photo.caption or PHOTO_INSTRUCTION, distance_to_next_m=depart.distance_to_next_m,
+        image=photo.image, image_source="creator_photo", landmark=photo.caption,
+        creator_photo=CreatorPhotoMeta(id=photo.id, lat=photo.lat, lng=photo.lng, accuracy_m=photo.accuracy_m, snapped_m=snapped),
+    )
+
+
+def _goal_photo_point(photo: CreatorPhoto, arrive: ExplorationPoint) -> ExplorationPoint:
+    """最後の写真がゴールのとき、最終区間の到着点を写真地点（到着）に置き換える。"""
+    snapped = haversine_m((photo.lat, photo.lng), (arrive.lat, arrive.lng))
+    return ExplorationPoint(
+        index=0, lat=arrive.lat, lng=arrive.lng, heading=arrive.heading, heading_out=None,
+        maneuver="CREATOR_PHOTO", turn="arrive",
+        instruction=photo.caption or PHOTO_INSTRUCTION, distance_to_next_m=0,
         image=photo.image, image_source="creator_photo", landmark=photo.caption,
         creator_photo=CreatorPhotoMeta(id=photo.id, lat=photo.lat, lng=photo.lng, accuracy_m=photo.accuracy_m, snapped_m=snapped),
     )
@@ -132,6 +149,8 @@ def merge_legs(legs: list[Leg], outputs: list[RouteOutput | None], origin: Place
             for s in skipped:
                 if s.photo_at_end is not None:
                     warnings.append(LegWarning("no_route", s.photo_at_end.id, f"写真 {s.photo_at_end.id} は前の写真と同じ地点として扱います"))
+    if pending_photo is not None:  # 最後の区間が写真で終わる = 目的地を省略して最後の写真がゴール
+        points[-1] = _goal_photo_point(pending_photo, points[-1])
     renumbered = [p.model_copy(update={"index": i}) for i, p in enumerate(points)]
     warnings.extend(w for p in renumbered if p.creator_photo and (w := _snap_warning(p)))
     path = _join_polylines([seg[2] for seg in segments])

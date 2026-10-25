@@ -123,3 +123,42 @@ def test_写真順の地図は番号順に写真を載せる() -> None:
     page = render_photos_map(plan, ORIGIN, DEST)
     assert page.index('"label": "S"') < page.index('"label": "0"') < page.index('"label": "1"') < page.index('"label": "G"')
     assert "photos/p0.jpg" in page and "赤いポスト" in page
+
+
+# --- 目的地を省略すると最後の写真がゴール（会場の写真で終わる道） ---
+
+def test_目的地なしなら最後の写真で区間が終わる() -> None:
+    legs = split_legs(ORIGIN, None, PHOTOS)
+    assert [(l.start.query, l.end.query) for l in legs] == [("S", "写真 0"), ("写真 0", "写真 1")]
+    assert [l.photo_at_end.id for l in legs] == ["p0", "p1"]
+    with pytest.raises(ValueError):
+        split_legs(ORIGIN, None, [])
+
+
+def test_目的地なしなら最後の写真が到着地点になる() -> None:
+    legs = split_legs(ORIGIN, None, PHOTOS)
+    goal = Place(query="赤いポスト", lat=C[0], lng=C[1])
+    merged = merge_legs(legs, [synthetic_route([A, B]), synthetic_route([B, C])], ORIGIN, goal)
+    e = merged.exploration
+    assert [p.maneuver for p in e.points] == ["DEPART", "CREATOR_PHOTO", "CREATOR_PHOTO"]
+    last = e.points[-1]
+    assert last.turn == "arrive" and last.creator_photo.id == "p1" and last.image == "photos/p1.jpg"
+    assert last.heading_out is None and last.distance_to_next_m == 0 and last.landmark == "赤いポスト"
+    assert e.points[1].turn == "left"  # 途中の写真は今までどおり曲がる向きを持つ
+    assert e.destination.query == "赤いポスト" and decode_polyline(e.polyline) == [A, B, C]
+    assert merged.warnings == []
+
+
+def test_PlanInputは目的地を省略できる_空文字も省略扱い_写真が無ければエラー() -> None:
+    from app.schemas.creator_input import goal_from_last_photo
+
+    base = {"name": "会場まで", "origin": "S", "photos": [p.model_dump() for p in PHOTOS]}
+    plan = PlanInput.model_validate(base)
+    assert plan.destination is None and plan.ends_at_last_photo
+    assert PlanInput.model_validate({**base, "destination": "  "}).destination is None
+    assert not PlanInput.model_validate({**base, "destination": "G"}).ends_at_last_photo
+    goal = goal_from_last_photo(plan.photos[-1])
+    assert (goal.query, goal.lat, goal.lng) == ("赤いポスト", C[0], C[1])
+    assert goal_from_last_photo(plan.photos[0]).query == "最後の写真の地点"
+    with pytest.raises(ValueError, match="写真が 1 枚以上"):
+        PlanInput.model_validate({"name": "x", "origin": "S", "photos": []})

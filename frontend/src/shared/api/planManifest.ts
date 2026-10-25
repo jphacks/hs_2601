@@ -33,7 +33,7 @@ export function buildPlanManifest(input: CreateRouteInput, fallbackCreatedAt: st
     version: 1,
     name: input.name.trim(),
     origin: input.origin.trim(),
-    destination: input.destination.trim(),
+    destination: input.destination.trim() || null,
     creator_id: input.creatorId,
     created_at: input.createdAt ?? fallbackCreatedAt,
     photos: input.photos.map(toManifestPhoto),

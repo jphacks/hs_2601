@@ -42,3 +42,6 @@ export const PHOTO_MAX_EDGE_PX = 1280
 
 /** 送信する写真の JPEG 品質 */
 export const PHOTO_JPEG_QUALITY = 0.88
+
+/** 目的地を省略したときのゴールの呼び名（backend の GOAL_PHOTO_LABEL と同じ）。最後の写真がゴールになる */
+export const GOAL_PHOTO_LABEL = '最後の写真の地点'

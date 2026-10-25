@@ -12,7 +12,7 @@ from pathlib import Path
 
 from app.core.config import get_settings
 from app.external.google.geocoding import GeocodingClient
-from app.schemas.creator_input import PlaceInput
+from app.schemas.creator_input import PlaceInput, goal_from_last_photo
 from app.schemas.exploration import Place
 from app.services.creator.cache import FileCache
 from app.services.creator.geocode import resolve_places as resolve_place_inputs
@@ -34,7 +34,8 @@ def main() -> None:
     args = ap.parse_args()
     plan = load_plan_input(args.input)
     cache = None if args.no_cache else FileCache(get_settings().cache_dir, "google")
-    origin, dest = resolve_places([plan.origin, plan.destination], cache)
+    goal = plan.destination or goal_from_last_photo(plan.photos[-1])  # 目的地を省略したら最後の写真がゴール
+    origin, dest = resolve_places([plan.origin, goal], cache)
     out = args.input / "photos_map.html"
     out.write_text(render_photos_map(plan, origin, dest), encoding="utf-8")
     print(f"{plan.name}: {origin.query} → {dest.query}, 写真 {len(plan.photos)} 枚")

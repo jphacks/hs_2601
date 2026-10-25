@@ -81,13 +81,18 @@ export function RouteCreateForm({
         />
       </label>
       <label className="block space-y-2">
-        <span className="text-sm font-semibold">目的地</span>
+        <span className="text-sm font-semibold">
+          目的地 <span className="font-normal text-stone-500">（任意）</span>
+        </span>
         <input
           className={inputClass}
           value={destination}
           onChange={(e) => onDestinationChange(e.target.value)}
           placeholder="例：平和記念公園"
         />
+        <span className="block text-xs text-stone-500">
+          空のままにすると、最後に撮った写真の場所がゴールになります（会場の写真で終わる道）
+        </span>
       </label>
 
       <div className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4">

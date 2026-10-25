@@ -103,3 +103,20 @@ describe('fixtureRouteId', () => {
     expect(fixtureRouteId('あ')).not.toBe(fixtureRouteId('い'))
   })
 })
+
+describe('目的地の省略', () => {
+  it('目的地が空なら最後の写真のメッセージか既定の呼び名がゴールになる', async () => {
+    const { api, advance } = apiWithClock()
+    const { jobId, routeId } = await api.createRoute(
+      input({ name: '会場まで', destination: '', photos: [{ ...PHOTO, caption: '会場の入口' }] }),
+    )
+    advance(1000)
+    expect((await api.getJobStatus(jobId)).state).toBe('done')
+    expect((await api.getRoutePlan(routeId)).destination).toBe('会場の入口')
+
+    const second = await api.createRoute(input({ name: 'メッセージなし', destination: ' ' }))
+    advance(1000)
+    await api.getJobStatus(second.jobId)
+    expect((await api.getRoutePlan(second.routeId)).destination).toBe('最後の写真の地点')
+  })
+})

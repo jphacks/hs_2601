@@ -19,7 +19,7 @@ from app.external.google.routes import RoutesClient
 from app.external.google.street_view import StreetViewClient
 from app.external.vlm.base import VlmClient, VlmError
 from app.external.vlm.factory import make_vlm_client
-from app.schemas.creator_input import PlanInput
+from app.schemas.creator_input import PlanInput, goal_from_last_photo
 from app.schemas.exploration import Exploration, Place
 from app.services.creator.arrow import draw_arrows
 from app.services.creator.cache import FileCache
@@ -113,10 +113,11 @@ def copy_photos(plan: PlanInput, src_dir: Path, out_dir: Path) -> None:
     (out_dir / PHOTOS_JSON).write_text(plan.model_dump_json(indent=2), encoding="utf-8")
 
 
-def _plan_photo_legs(c: PipelineClients, plan: PlanInput, origin: Place, dest: Place, out_dir: Path,
-                     rep: Reporter) -> Exploration:
+def _plan_photo_legs(c: PipelineClients, plan: PlanInput, origin: Place, legs_dest: Place | None, dest: Place,
+                     out_dir: Path, rep: Reporter) -> Exploration:
+    """legs_dest が None なら最後の写真で終わる。dest は表示用のゴール（写真地点の Place）。"""
     rep.on_step("route")
-    legs = split_legs(origin, dest, plan.photos)
+    legs = split_legs(origin, legs_dest, plan.photos)
     outputs, leg_warnings = plan_legs(c.routes, legs, c.google_cache)
     (out_dir / "legs").mkdir(exist_ok=True)
     for leg, out in zip(legs, outputs):
@@ -138,11 +139,14 @@ def explore_photos(c: PipelineClients, plan: PlanInput, out_dir: Path, rep: Repo
                    *, src_dir: Path | None = None) -> PipelineResult:
     """photos.json（PlanInput）から geocode（座標が無いときだけ）→ 区間ごとの route → 結合。"""
     rep.on_step("geocode")
-    origin, dest = resolve_places([plan.origin, plan.destination], c.geocoding, c.google_cache)
-    rep.log(f"[2/7] geocode: {_fmt_place(origin)} → {_fmt_place(dest)}  写真 {len(plan.photos)} 枚")
+    goal = plan.destination or goal_from_last_photo(plan.photos[-1])  # 省略時は最後の写真がゴール
+    origin, dest = resolve_places([plan.origin, goal], c.geocoding, c.google_cache)
+    note = "（目的地なし: 最後の写真がゴール）" if plan.ends_at_last_photo else ""
+    rep.log(f"[2/7] geocode: {_fmt_place(origin)} → {_fmt_place(dest)}  写真 {len(plan.photos)} 枚{note}")
     if src_dir is not None:
         copy_photos(plan, src_dir, out_dir)
-    return PipelineResult(_plan_photo_legs(c, plan, origin, dest, out_dir, rep), origin, dest)
+    legs_dest = None if plan.ends_at_last_photo else dest
+    return PipelineResult(_plan_photo_legs(c, plan, origin, legs_dest, dest, out_dir, rep), origin, dest)
 
 
 # --- 共通の後半（画像・目印・矢印） ---

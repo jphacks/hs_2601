@@ -173,6 +173,15 @@ def test_写真0枚でも受け付ける(ctx: Ctx) -> None:
     assert ctx.repo.rows[RID].plan.steps[0].image_url is None
 
 
+def test_目的地を省略しても受け付ける_写真も無ければ400(ctx: Ctx) -> None:
+    m = {k: v for k, v in manifest(2).items() if k != "destination"}
+    res = ctx.client.post("/api/routes", data={"manifest": json.dumps(m, ensure_ascii=False)}, files=files_for(m))
+    assert res.status_code == 202, res.text
+    empty = {**m, "photos": []}
+    res = ctx.client.post("/api/routes", data={"manifest": json.dumps(empty, ensure_ascii=False)})
+    assert res.status_code == 400 and "写真が 1 枚以上" in res.json()["detail"]
+
+
 def test_同じ作成者なら上書きでき_別の作成者なら409(ctx: Ctx) -> None:
     assert ctx.post(manifest()).status_code == 202
     assert ctx.post(manifest(1)).status_code == 202

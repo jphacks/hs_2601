@@ -27,6 +27,7 @@ export interface CreateRouteInput {
   /** 命名。ID はこのハッシュ（3 章） */
   name: string
   origin: string
+  /** 空なら目的地を省略し、最後の写真をゴールにする（interface.md 4 章） */
   destination: string
   photos: PhotoInput[]
   creatorId: string
@@ -95,7 +96,8 @@ export interface PlanInput {
   version: 1
   name: string
   origin: string
-  destination: string
+  /** null なら最後の写真がゴール */
+  destination: string | null
   creator_id: string
   created_at: string
   photos: PlanInputPhoto[]
