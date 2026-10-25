@@ -244,15 +244,29 @@ def test_経路があれば進行方向だけを向き_角より手前から撮�
     assert all(c.street_view.offset_m > 0 for c in cands)  # 角より手前
 
 
+def _strict(locate, tmp_path: Path):
+    from app.services.creator.route import decode_polyline
+    from app.services.creator.streetview import StreetViewOptions, fetch_travel_candidates
+    e = _turn_exploration()
+    return fetch_travel_candidates(_client(locate), e.points[0], tmp_path, StreetViewOptions(), decode_polyline(e.polyline))
+
+
 def test_経路から離れたパノラマは使わない(tmp_path: Path) -> None:
-    from app.services.creator.streetview import fetch_candidates
     off = lambda lat, lng: (lat - 0.0003, lng)  # 約 33 m 南（別の道）
-    e2, _ = fetch_candidates(_client(off), _turn_exploration(), tmp_path)
-    assert e2.points[0].candidates == [] and e2.points[0].image is None
+    q = _strict(off, tmp_path)
+    assert q.candidates == [] and q.image is None
 
 
 def test_角を越えた先のパノラマは使わない(tmp_path: Path) -> None:
-    from app.services.creator.streetview import fetch_candidates
     past = lambda lat, lng: (CORNER[0] + 0.0002, CORNER[1])  # 角を曲がった先 約 22 m
-    e2, _ = fetch_candidates(_client(past), _turn_exploration(), tmp_path)
-    assert e2.points[0].candidates == []
+    assert _strict(past, tmp_path).candidates == []
+
+
+def test_厳しい条件で無ければ緩めて探し_それでも無ければ旧方式で必ず探す(tmp_path: Path) -> None:
+    from app.services.creator.streetview import TRAVEL_MODE, fetch_candidates
+    near = lambda lat, lng: (lat - 0.00015, lng)  # 約 17 m 南: 厳しい条件（8 m）では外れ、緩めた条件（25 m）なら使う
+    e2, _ = fetch_candidates(_client(near), _turn_exploration(), tmp_path)
+    assert e2.points[0].candidates and all(c.heading_mode == TRAVEL_MODE for c in e2.points[0].candidates)
+    far = lambda lat, lng: (lat - 0.0005, lng)  # 約 55 m 南: 進行方向の候補は無い → 旧方式
+    e3, _ = fetch_candidates(_client(far), _turn_exploration(), tmp_path / "far")
+    assert e3.points[0].candidates and all(c.heading_mode != TRAVEL_MODE for c in e3.points[0].candidates)

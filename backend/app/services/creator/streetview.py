@@ -222,6 +222,19 @@ TRAVEL_SPARE = 2  # 公式撮影を優先して選ぶため、target より少�
 
 
 @dataclass(frozen=True)
+class TravelLimits:
+    """進行方向の候補を探す条件。厳しい条件で見つからなければ緩めて探し直す。"""
+    search_radius_m: int = SEARCH_RADIUS_M
+    on_route_m: float = ON_ROUTE_M
+    past_corner_m: float = PAST_CORNER_M
+
+
+STRICT = TravelLimits()
+# 構内・路地など Street View がまばらな所用。経路から少し離れた・角を少し越えたパノラマも使う（向きは進行方向のまま）
+RELAXED = TravelLimits(search_radius_m=50, on_route_m=25.0, past_corner_m=8.0)
+
+
+@dataclass(frozen=True)
 class TravelShot:
     meta: PanoMeta
     heading: float
@@ -229,7 +242,7 @@ class TravelShot:
 
 
 def travel_shots(client: StreetViewClient, p: ExplorationPoint, route: list[LatLngT], base: StreetViewOptions,
-                 target: int) -> list[TravelShot]:
+                 target: int, limits: TravelLimits = STRICT) -> list[TravelShot]:
     """経路に沿って撮影位置を探し、経路上・曲がり角より手前のパノラマだけを、その場所で歩く向きで撮る。公式撮影を先に並べる。"""
     corner_arc = project_to_path(route, (p.lat, p.lng))[1]
     depart = p.maneuver.upper() == "DEPART"
@@ -240,12 +253,12 @@ def travel_shots(client: StreetViewClient, p: ExplorationPoint, route: list[LatL
         if arc < 0 or len(shots) >= target + TRAVEL_SPARE:
             continue
         lat, lng = point_at(route, arc)
-        meta = client.metadata(lat, lng, radius_m=SEARCH_RADIUS_M)
+        meta = client.metadata(lat, lng, radius_m=limits.search_radius_m)
         if meta is None or meta.pano_id in seen:
             continue
         seen.add(meta.pano_id)
         off_route, pano_arc = project_to_path(route, (meta.lat, meta.lng))
-        if off_route > ON_ROUTE_M or (not depart and pano_arc > corner_arc + PAST_CORNER_M):
+        if off_route > limits.on_route_m or (not depart and pano_arc > corner_arc + limits.past_corner_m):
             continue
         heading = travel_heading(route, pano_arc, stop_m=None if depart else corner_arc)
         if heading is None:
@@ -268,12 +281,12 @@ def _fetch_image(client: StreetViewClient, pano_id: str, heading: float, opt: St
 
 def fetch_travel_candidates(
     client: StreetViewClient, p: ExplorationPoint, out_dir: Path, base: StreetViewOptions, route: list[LatLngT],
-    cache: FileCache | None = None, target: int = TRAVEL_TARGET,
+    cache: FileCache | None = None, target: int = TRAVEL_TARGET, limits: TravelLimits = STRICT,
 ) -> ExplorationPoint:
     """進行方向の候補だけを取る（向きは回さない）。画角・ピッチは base のまま。"""
     opt = StreetViewOptions(**{**base.__dict__, "fov": 90, "pitch": 0})
     cands: list[ImageCandidate] = []
-    for shot in travel_shots(client, p, route, opt, target):
+    for shot in travel_shots(client, p, route, opt, target, limits):
         rel = f"{IMAGE_DIR}/{p.index:03d}_c{len(cands)}.jpg"
         (out_dir / rel).parent.mkdir(parents=True, exist_ok=True)
         (out_dir / rel).write_bytes(_fetch_image(client, shot.meta.pano_id, shot.heading, opt, cache))
@@ -341,6 +354,17 @@ def fetch_point_candidates(
     })
 
 
+def fetch_with_fallback(client: StreetViewClient, p: ExplorationPoint, out_dir: Path, base: StreetViewOptions,
+                        route: list[LatLngT], cache: FileCache | None) -> ExplorationPoint:
+    """進行方向の候補（厳しい条件 → 緩めた条件）→ 旧方式（向きを回した候補も使う）の順に探す。
+    どれでも見つからない地点は、パイプラインで地図画像を付ける（写真なしにしない）。"""
+    for limits in (STRICT, RELAXED):
+        q = fetch_travel_candidates(client, p, out_dir, base, route, cache, limits=limits)
+        if q.candidates:
+            return q
+    return fetch_point_candidates(client, p, out_dir, base, None, cache)
+
+
 def fetch_candidates(
     client: StreetViewClient, e: Exploration, out_dir: Path, base: StreetViewOptions | None = None,
     variants: tuple[Variant, ...] | None = None, cache: FileCache | None = None,
@@ -357,7 +381,7 @@ def fetch_candidates(
             skipped.append(p.index)
             points.append(p)
             continue
-        q = (fetch_travel_candidates(client, p, out_dir, base, route, cache) if travel
+        q = (fetch_with_fallback(client, p, out_dir, base, route, cache) if travel
              else fetch_point_candidates(client, p, out_dir, base, variants, cache))
         (fetched if q.candidates else missing).append(p.index)
         points.append(q)

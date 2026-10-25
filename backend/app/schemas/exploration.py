@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Turn = Literal["left", "right", "straight", "arrive"]
-ImageSource = Literal["street_view", "creator_photo"]
+ImageSource = Literal["street_view", "creator_photo", "map"]  # map: Street View が無い地点の地図画像（地理院タイル）
 
 
 class Place(BaseModel):

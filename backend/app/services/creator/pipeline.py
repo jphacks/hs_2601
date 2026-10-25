@@ -23,6 +23,9 @@ from app.schemas.creator_input import PlanInput, goal_from_last_photo
 from app.schemas.exploration import Exploration, Place
 from app.services.creator.arrow import draw_arrows
 from app.services.creator.cache import FileCache
+from app.imaging.route_tile_map import TileFetcher
+from app.services.creator import map_fallback
+from app.services.creator.map_fallback import add_map_images
 from app.services.creator.route_map import render_route_map
 from app.services.creator.contact import render_contact_html
 from app.services.creator.geocode import geocode_queries, resolve_places
@@ -54,6 +57,7 @@ class PipelineClients:
     make_vlm: Callable[[], VlmClient] | None = None  # None なら VLM を使わない（フォールバック文のみ）
     google_cache: FileCache | None = None
     vlm_cache: FileCache | None = None
+    map_tiles: TileFetcher | None = None  # 地図画像のタイル取得。None なら地理院タイルを HTTP で取る
 
 
 @dataclass(frozen=True)
@@ -182,6 +186,9 @@ def enrich(c: PipelineClients, e: Exploration, out_dir: Path, opt: StreetViewOpt
     e, a = draw_arrows(e, out_dir)
     rep.log(f"[7/7] arrow: 描画 {len(a.drawn)}（地図+画像 {len(a.with_fused_path)} / 地図の投影 {len(a.with_geo_path)} / VLM のみ {len(a.with_vlm_path)}）"
             f"/ 画像なし {len(a.skipped)} / 作成者写真 {len(a.creator)}")
+    e, m = add_map_images(e, out_dir, c.map_tiles or map_fallback.gsi_tile_fetcher(c.google_cache))
+    if m.drawn:
+        rep.log(f"      Street View が無い地点 {m.drawn} は地図画像にしました")
     return e
 
 
