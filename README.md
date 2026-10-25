@@ -107,9 +107,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ### スマホから確認する
 
 `npm run dev` の出力に表示される `Network: http://192.168.x.x:5173/` を、同じ Wi-Fi に繋いだスマホで開く。
-カメラ・位置情報を使う機能は HTTPS が必要になるので、その段階で Cloudflare Tunnel か ngrok を使う。
+カメラ・位置情報・QR を使う機能は HTTPS が必要になるので、その段階で Cloudflare Tunnel を使う（無料、アカウント不要、WSL のポート転送設定も不要、外出先からも開ける）。
+手順は [docs/tunnel.md](docs/tunnel.md)。
 
 ```bash
-# 例: ngrok
-ngrok http 5173
+cloudflared tunnel --url http://localhost:5173   # 表示される https://xxxx.trycloudflare.com をスマホで開く
 ```

@@ -295,7 +295,7 @@ QR の生成は `segno`、読み取り（テスト・確認用）は `zxing-cpp`
 ### ステップ 11: 外部のスマホで QR → 写真列を通す（backend だけで完結）
 
 フロント無しでも、API サーバーが `/r/<id>` で写真列の HTML を返す（`app/api/follower.py`）。
-開発 PC を Cloudflare Tunnel で HTTPS 公開し、その URL を QR にすればスマホで開ける。
+開発 PC を Cloudflare Tunnel で HTTPS 公開し、その URL を QR にすればスマホで開ける（トンネルの詳しい使い方とフロント側の手順は [docs/tunnel.md](../docs/tunnel.md)）。
 
 ```bash
 # 1. cloudflared を入れる（初回のみ。アカウント不要）

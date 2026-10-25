@@ -122,7 +122,7 @@ hs_2601/
 │       ├── creator/  follower/  shared/
 │       └── fixtures/              # Routes API のレスポンス例、サンプル画像
 │
-├── infra/                         # docker-compose、Cloudflare Tunnel / ngrok の手順
+├── docs/tunnel.md                 # Cloudflare Tunnel で開発 PC をスマホから開く手順
 ├── scripts/                       # セットアップ、サンプルデータ投入
 ├── .github/workflows/             # lint / test
 ├── .env.example

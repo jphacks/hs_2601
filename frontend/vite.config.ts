@@ -8,5 +8,6 @@ export default defineConfig({
   server: {
     host: true, // 同一ネットワークのスマホから接続できるようにする
     port: 5173,
+    allowedHosts: ['.trycloudflare.com'], // Cloudflare Tunnel 経由のスマホからのアクセスを許可
   },
 })
