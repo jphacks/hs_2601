@@ -21,7 +21,7 @@ npm run lint    # oxlint（creator ⇄ follower の import 禁止も検査）
 | http://localhost:5173/ | `/c` にリダイレクト |
 | http://localhost:5173/c | 作る人のホーム（「道を作る」「作った道を公開する」） |
 | http://localhost:5173/c/routes | 一覧。サンプル「四天王寺 南大門 → 天王寺公園 てんしば」が公開済みで入っている |
-| http://localhost:5173/r | 参加者の入口。案内 ID を入力するか「サンプルの道案内を開く」を押す |
+| http://localhost:5173/r | 参加者の入口。QR を読み取る（PC は Web カメラ）か、案内 ID を入力するか、「サンプルの道案内を開く」を押す |
 | http://localhost:5173/r/7298a7dd6554 | 参加者画面。サンプルの写真列が 9 ステップ表示される |
 
 バックエンドに繋ぐときは `.env.local` に `VITE_API_MODE=server` を書く（`.env.example` 参照）。
