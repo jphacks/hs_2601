@@ -78,38 +78,77 @@ hs_2601/
 
 ## 起動と画面確認
 
-ターミナルを 2 つ開き、フロントとバックをそれぞれ起動する。
+スマホの実機で、作る人・参加者の両方の画面が動くところまでの手順。
+カメラ・位置情報・QR 読み取りは HTTPS が必要なので、Cloudflare Tunnel で開発 PC に一時的な `https://xxxx.trycloudflare.com` を付けて開く（無料、アカウント不要、WSL のポート転送設定も不要、同じ Wi-Fi でなくても開ける）。
+詳しい説明とつまずきどころは [docs/tunnel.md](docs/tunnel.md)。
+
+### 1. 初回のみ: 準備
 
 ```bash
-# ターミナル 1: frontend
-cd frontend
-npm install        # 初回のみ
-npm run dev
+cd frontend && npm install && cp .env.example .env.local && cd ..
+cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && cd ..
 ```
 
+- `backend/.env` に API キーと Supabase の接続情報を書く（`backend/.env.example` 参照）。
+- `cloudflared` をインストールする（[docs/tunnel.md](docs/tunnel.md) の 1 章）。
+
+### 2. バックエンドを起動して公開する
+
 ```bash
-# ターミナル 2: backend
-cd backend
-python3 -m venv .venv && source .venv/bin/activate   # 初回のみ
-pip install -r requirements.txt                       # 初回のみ
+# ターミナル 1: API サーバー
+cd backend && source .venv/bin/activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-ブラウザで次を開き、表示を確認する。
+```bash
+# ターミナル 2: API サーバーに公開 URL を付ける
+cloudflared tunnel --url http://localhost:8000
+```
 
-| 確認対象 | URL | 期待する表示 |
-|---|---|---|
-| 作る人の画面 | http://localhost:5173/c | 「作る人」の見出し |
-| 参加者の画面 | http://localhost:5173/r/sample | 「参加者」「道案内 ID: sample」 |
-| バックエンド疎通 | http://localhost:8000/health | `{"status":"ok"}` |
-| API 一覧 | http://localhost:8000/docs | Swagger UI |
+ログに出た `https://yyyy.trycloudflare.com` を控える。`https://yyyy.trycloudflare.com/health` を開いて `{"status":"ok"}` が出れば OK。
 
-### スマホから確認する
-
-`npm run dev` の出力に表示される `Network: http://192.168.x.x:5173/` を、同じ Wi-Fi に繋いだスマホで開く。
-カメラ・位置情報・QR を使う機能は HTTPS が必要になるので、その段階で Cloudflare Tunnel を使う（無料、アカウント不要、WSL のポート転送設定も不要、外出先からも開ける）。
-手順は [docs/tunnel.md](docs/tunnel.md)。
+### 3. フロントを公開する
 
 ```bash
-cloudflared tunnel --url http://localhost:5173   # 表示される https://xxxx.trycloudflare.com をスマホで開く
+# ターミナル 3: フロントに公開 URL を付ける
+cloudflared tunnel --url http://localhost:5173
 ```
+
+ログに出た `https://xxxx.trycloudflare.com` を控える。
+
+### 4. 公開 URL を設定に書く
+
+```bash
+# frontend/.env.local
+VITE_API_MODE=server
+VITE_API_BASE_URL=https://yyyy.trycloudflare.com   # 2 で控えた URL
+
+# backend/.env
+PUBLIC_BASE_URL=https://xxxx.trycloudflare.com     # 3 で控えた URL。参加者 URL と QR の飛び先になる
+```
+
+`backend/.env` を変えたら、ターミナル 1 の uvicorn を起動し直す。
+
+### 5. フロントを起動する
+
+```bash
+# ターミナル 4
+cd frontend && npm run dev
+```
+
+### 6. スマホで開く
+
+| 画面 | 開く URL | できること |
+|---|---|---|
+| 作る人 | `https://xxxx.trycloudflare.com/c` | 出発地・目的地の入力、撮影、作成、一覧、公開 |
+| 参加者の入口 | `https://xxxx.trycloudflare.com/r` | QR 読み取り、案内 ID の入力 |
+| 参加者の道案内 | `https://xxxx.trycloudflare.com/r/7298a7dd6554` | 公開済みサンプル（命名「四天王寺→てんしば」）の写真列 |
+
+作る人の画面で公開すると、その道の参加者 URL が出る。それを QR にしてスマホの標準カメラか参加者の入口で読めば、道案内が開く。
+
+### 注意
+
+- `cloudflared` を起動し直すと URL が変わる。そのたびに 4 と 5 をやり直し、配布済みの QR も作り直す。
+- バックエンドなしで画面だけ見るときは、`frontend/.env.local` を `VITE_API_MODE=fixture` にして 3・5・6 だけ行う。写真列は `frontend/src/shared/fixtures/sampleRoutePlan.json` が表示される。
+- 同じ Wi-Fi なら `npm run dev` の出力にある `Network:` の URL でも画面は見られるが、HTTPS ではないのでカメラ・位置情報・QR 読み取りは動かない。
+- API の一覧はバックエンドの公開 URL の `/docs`（Swagger UI）で見られる。
