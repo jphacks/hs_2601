@@ -21,3 +21,4 @@ def health() -> dict[str, str]:
 
 app.include_router(creator.router, prefix="/api", tags=["creator"])
 app.include_router(follower.router, prefix="/api", tags=["follower"])
+app.include_router(follower.pages, tags=["follower"])  # /r/{id}: QR の飛び先

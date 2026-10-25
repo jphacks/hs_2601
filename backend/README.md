@@ -275,6 +275,33 @@ pytest -m live             # 実際の Supabase を叩く版（保存済みの�
 
 QR の生成は `segno`、読み取り（テスト・確認用）は `zxing-cpp`。参加者側のロジックは `app/services/follower/`。
 
+### ステップ 11: 外部のスマホで QR → 写真列を通す（backend だけで完結）
+
+フロント無しでも、API サーバーが `/r/<id>` で写真列の HTML を返す（`app/api/follower.py`）。
+開発 PC を Cloudflare Tunnel で HTTPS 公開し、その URL を QR にすればスマホで開ける。
+
+```bash
+# 1. cloudflared を入れる（初回のみ。アカウント不要）
+curl -L -o ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+chmod +x ~/.local/bin/cloudflared
+
+# 2. API サーバーを起動（端末 A）
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 3. 公開 URL を発行（端末 B）。表示される https://xxxx.trycloudflare.com を控える
+cloudflared tunnel --url http://localhost:8000
+
+# 4. その URL を .env の PUBLIC_BASE_URL に書き、QR を作り直す（端末 C）
+python -m scripts.publish --from-route ./out/cases/5 --name "四天王寺→てんしば"
+explorer.exe out/cases/5/qr.png
+
+# 5. スマホの標準カメラで qr.png を読む → https://xxxx.trycloudflare.com/r/<id> が開き、写真列が表示される
+```
+
+- 一時 URL は `cloudflared` を起動し直すたびに変わる。変わったら 4 をやり直す。
+- 確認用の HTML（`app/services/follower/view.py`）は画像を縦に並べるだけ。本番の参加者画面はフロントが `GET /api/public/routes/<id>` か Supabase 直読みで作る（docs/interface.md）。
+- サーバー側の確認: `curl -s http://localhost:8000/r/<id> | grep -c "<img"` が地点数と一致すれば OK。
+
 | 出力 | 内容 |
 |---|---|
 | `route_plans` の 1 行 | `id`（命名の SHA-256 先頭 12 桁）、`name`、`status`、`plan_json`（ステップ配列 + ポリライン） |
@@ -295,7 +322,8 @@ app/
 │   └── config.py        # .env / 環境変数の読み込み（get_settings()）。out_dir、cache_dir
 ├── api/
 │   ├── creator.py       # 作る人向け API（作成受付 / ステータス / 一覧 / 公開）
-│   └── follower.py      # 参加者向け API（公開済み詳細取得）
+│   ├── follower.py      # 参加者向け: GET /api/public/routes/{id}（JSON）、GET /r/{id}（HTML、QR の飛び先）
+│   └── deps.py          # 依存関係（anon キーのリポジトリ）。テストで差し替える
 ├── schemas/
 │   ├── exploration.py   # 経路探索の中間形式 route.json（内部用）
 │   └── route_plan.py    # 参加者に渡す公開形式（route_plans.plan_json）
