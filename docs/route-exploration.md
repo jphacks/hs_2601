@@ -85,7 +85,7 @@ out/
 | `image_source` | `"street_view"` \| `"creator_photo"` \| null | 画像の出所。作成者の写真を差し込む段階で `creator_photo` が増える | streetview |
 | `street_view` | object \| null | 取得時のパラメータ（pano_id、撮影年月、heading、fov、pitch、copyright、offset_m）。copyright に Google を含めば公式撮影 | streetview |
 | `landmark` | string \| null | VLM が選んだ画像での目印の短い説明。VLM 不可なら案内文と距離からのフォールバック文 | landmark |
-| `arrow_image` | string \| null | 採用画像に曲線の矢印を重ねた画像の相対パス。経路は VLM の `arrow_path`、無ければ turn ごとの既定形 | arrow |
+| `arrow_image` | string \| null | 採用画像に矢印を重ねた画像の相対パス。点列は経路のポリラインをパノラマの位置・向きから画像に投影したもの、投影できなければ VLM の `arrow_path`、それも無ければ turn ごとの既定形 | arrow |
 
 ### 決めごと
 
@@ -113,8 +113,8 @@ out/
 | 4 | `services/creator/turns.py` + `geo.py` + `scripts/turns.py` | `python -m scripts.turns --from-raw ./out` で採用・不採用が色分けされた地図と `route.json` が出る（実装済み。しきい値は検証中） | 3 の fixture |
 | 5 | `external/google/street_view.py` + `services/creator/streetview.py` + `contact.py` + `scripts/streetview.py` | `python -m scripts.streetview --from-route DIR` で各地点に **候補画像が複数**（向き 3 種 × 位置 2 種、重複除去）並ぶ（完了） | 4 |
 | 6 | `scripts/explore_route.py` + `services/creator/cache.py` | コマンド 1 発で `out/` 一式ができる。同じ入力は `.cache/` を再利用。7 も組み込み済み（完了） | 2〜5、7 |
-| 7 | `external/vlm/`（Gemini / Claude）+ `services/creator/landmark.py` + `scripts/landmark.py` | VLM が候補ごとに「目印のわかりやすさ」「曲がる場所のわかりやすさ」を 1〜5 で採点し、最良の 1 枚を `image` に採用、`landmark` に目印文（完了。既定は Gemini 2.5 Flash-Lite の無料枠） | 5、VLM キー |
-| 8 | `imaging/arrow.py` + `services/creator/arrow.py` + `scripts/arrow.py` | VLM が返した画像内の経路（`arrow_path`）に沿って曲線の矢印を描き `arrow_image` に入れる（完了） | 7 |
+| 7 | `external/vlm/`（Gemini / Claude）+ `services/creator/landmark.py` + `scripts/landmark.py` | VLM に候補画像と経路情報（地点・前後の経路の緯度経度と方位、各候補の撮影位置・カメラの向き・画角、経路の投影線）を渡し、候補ごとに「現在地のわかりやすさ」「矢印の引きやすさ」を 1〜5 で採点、最良の 1 枚を `image` に採用、`landmark` に目印文（完了。既定は Gemini） | 5、VLM キー |
+| 8 | `imaging/projection.py` + `services/creator/arrow_geo.py` + `services/creator/arrow.py` + `scripts/arrow.py` | 経路のポリラインをパノラマの位置・向き・画角から画像に投影して道なりの点列を作り、矢印を描いて `arrow_image` に入れる。投影できない地点は VLM の `arrow_path` にフォールバック（完了） | 7 |
 
 - 4 は API キーが届く前でも着手できる。3 で取った生レスポンスを `tests/fixtures/routes_sample.json` として置く。
 - 6 まで終われば中間発表のデモ素材になる。7 と 8 は並行で進められる。

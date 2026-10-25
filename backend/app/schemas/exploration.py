@@ -26,7 +26,9 @@ class StreetViewMeta(BaseModel):
     fov: int = 90
     pitch: int = 0
     copyright: str | None = None  # "© 2026 Google" なら公式撮影。それ以外はユーザー投稿
-    offset_m: float = 0.0  # 交差点の何 m 手前のパノラマを使ったか
+    offset_m: float = 0.0  # 交差点の何 m 手前のパノラマを使ったか（負なら曲がった先）
+    lat: float | None = None  # パノラマの撮影位置（矢印の投影に使う）。古い route.json には無い
+    lng: float | None = None
 
 
 class ArrowPoint(BaseModel):

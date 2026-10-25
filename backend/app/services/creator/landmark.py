@@ -14,7 +14,11 @@ from pathlib import Path
 
 from app.external.vlm.base import Evaluation, VlmClient, VlmError
 from app.schemas.exploration import ArrowPoint, Exploration, ExplorationPoint, VlmScore
+from app.services.creator.arrow_geo import geo_visibility
 from app.services.creator.cache import FileCache, cache_key
+from app.services.creator.geo import LatLngT
+from app.services.creator.route import decode_polyline
+from app.services.creator.vlm_context import candidate_context, route_context
 
 log = logging.getLogger(__name__)
 
@@ -46,15 +50,18 @@ def pano_groups(p: ExplorationPoint) -> str:
     return " / ".join("画像 " + ",".join(map(str, idx)) for idx in groups.values()) or "なし"
 
 
-def build_prompt(p: ExplorationPoint, n: int, template: str | None = None) -> str:
+def build_prompt(p: ExplorationPoint, n: int, template: str | None = None, route: list[LatLngT] | None = None) -> str:
+    """プロンプト。画像だけでなく、経路情報と各候補の撮影位置・向き・経路の投影線を文章で添える。"""
     tpl = template or PROMPT_PATH.read_text(encoding="utf-8")
     return tpl.format(n=n, turn_label=TURN_LABEL[p.turn], instruction=p.instruction or "（案内文なし）",
-                      distance_m=p.distance_to_next_m, groups=pano_groups(p))
+                      distance_m=p.distance_to_next_m, groups=pano_groups(p),
+                      route_info=route_context(p, route), images_info=candidate_context(p, p.candidates[:n], route))
 
 
-def _evaluate_point(client: VlmClient, p: ExplorationPoint, out_dir: Path, cache: FileCache | None) -> Evaluation | None:
+def _evaluate_point(client: VlmClient, p: ExplorationPoint, out_dir: Path, cache: FileCache | None,
+                    route: list[LatLngT] | None = None) -> Evaluation | None:
     images = [(out_dir / c.image).read_bytes() for c in p.candidates]
-    prompt = build_prompt(p, len(images))
+    prompt = build_prompt(p, len(images), route=route)
     digests = [hashlib.sha256(b).hexdigest()[:16] for b in images]
     key = cache_key("vlm", client.model, prompt, digests)
     cached = cache.get_json(key) if cache else None
@@ -67,16 +74,28 @@ def _evaluate_point(client: VlmClient, p: ExplorationPoint, out_dir: Path, cache
     return ev
 
 
-def choose_best(cands: list, model_best: int) -> int:
-    """立てる候補の中から選ぶ。モデルの選択が立てる候補ならそれを尊重し、そうでなければ点数で選び直す。"""
+def geo_rank(cands: list, p: ExplorationPoint, route: list[LatLngT] | None) -> dict[int, tuple[bool, bool, bool, bool]]:
+    """候補ごとの (経路が見える, 公式撮影, 曲がり角まで見える, 足元から始まる)。経路が無ければ全部 True 扱い。"""
+    if not route:
+        return {i: (True, True, True, True) for i in range(len(cands))}
+    return {i: geo_visibility(route, p, c.street_view).rank for i, c in enumerate(cands)}
+
+
+def choose_best(cands: list, model_best: int, p: ExplorationPoint | None = None, route: list[LatLngT] | None = None) -> int:
+    """立てる候補の中から選ぶ。経路（道なり）が曲がり角まで画像に見える候補を優先し、
+    その中でモデルの選択があればそれを尊重し、無ければ点数で選び直す。"""
     scored = [(i, c.score) for i, c in enumerate(cands) if c.score is not None]
     walkable = [(i, sc) for i, sc in scored if sc.on_walkway] or scored
+    if p is not None:
+        rank = geo_rank(cands, p, route)
+        top = max(rank[i] for i, _ in walkable)  # (見える, 公式, 曲がり角まで, 足元から) の最良
+        walkable = [(i, sc) for i, sc in walkable if rank[i] == top]
     if any(i == model_best for i, _ in walkable):
         return model_best
     return max(walkable, key=lambda t: (t[1].here + t[1].arrow, t[1].arrow))[0]
 
 
-def apply_evaluation(p: ExplorationPoint, ev: Evaluation) -> ExplorationPoint:
+def apply_evaluation(p: ExplorationPoint, ev: Evaluation, route: list[LatLngT] | None = None) -> ExplorationPoint:
     by_index = {e.index: e for e in ev.evaluations}
     # 「立てるか」「進めるか」は向きではなく撮影地点の性質。同じパノラマの候補が 1 枚でも該当すれば全部除外する
     bad_panos = {
@@ -92,7 +111,7 @@ def apply_evaluation(p: ExplorationPoint, ev: Evaluation) -> ExplorationPoint:
         if (e := by_index.get(i)) else c
         for i, c in enumerate(p.candidates)
     ]
-    best_index = choose_best(cands, ev.best_index)
+    best_index = choose_best(cands, ev.best_index, p, route)
     best = cands[best_index]
     text = best.score.landmark_text if best.score and best.score.landmark_text and best.score.landmark_text != "目印なし" else None
     return p.model_copy(update={
@@ -103,6 +122,7 @@ def apply_evaluation(p: ExplorationPoint, ev: Evaluation) -> ExplorationPoint:
 
 
 def evaluate_landmarks(client: VlmClient | None, e: Exploration, out_dir: Path, cache: FileCache | None = None) -> tuple[Exploration, LandmarkStats]:
+    route = decode_polyline(e.polyline)
     evaluated: list[int] = []
     fallback: list[int] = []
     errors: dict[int, str] = {}
@@ -118,8 +138,8 @@ def evaluate_landmarks(client: VlmClient | None, e: Exploration, out_dir: Path, 
             points.append(p.model_copy(update={"landmark": p.landmark or fallback_text(p)}))
             continue
         try:
-            ev = _evaluate_point(client, p, out_dir, cache)
-            points.append(apply_evaluation(p, ev))
+            ev = _evaluate_point(client, p, out_dir, cache, route)
+            points.append(apply_evaluation(p, ev, route))
             evaluated.append(p.index)
         except VlmError as err:
             log.warning("point %d: VLM failed: %s", p.index, err)

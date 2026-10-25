@@ -143,7 +143,7 @@ def main() -> None:
 
     # 8. 矢印
     e, astats = draw_arrows(e, out_dir)
-    print(f"[7/7] arrow: 描画 {len(astats.drawn)}（VLM 経路 {len(astats.with_vlm_path)}）/ 画像なし {len(astats.skipped)} / 作成者写真 {len(astats.creator)}")
+    print(f"[7/7] arrow: 描画 {len(astats.drawn)}（投影 {len(astats.with_geo_path)} / VLM {len(astats.with_vlm_path)}）/ 画像なし {len(astats.skipped)} / 作成者写真 {len(astats.creator)}")
 
     title = f"{origin.query} → {dest.query}（{e.total_distance_m} m, {len(e.points)} 地点）"
     (out_dir / "route.json").write_text(e.model_dump_json(indent=2), encoding="utf-8")

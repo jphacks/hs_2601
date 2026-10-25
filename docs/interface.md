@@ -34,7 +34,7 @@ Supabase のテーブル `route_plans` の 1 行。参加者が使うのは `pla
       "instruction": "直進して奈良街道/国道25号に向かう",
       "landmark": "天王寺南門筋の標識",
       "distance_to_next_m": 36,
-      "image_url": "https://<project>.supabase.co/storage/v1/object/public/plans/7298a7dd6554/000.jpg"
+      "image_url": "https://<project>.supabase.co/storage/v1/object/public/plans/7298a7dd6554/000.png"
     }
   ]
 }
@@ -80,6 +80,48 @@ GET {SUPABASE_URL}/rest/v1/route_plans?id=eq.<id>
 - QR コードはこの URL をそのまま符号化したもの。バックエンドが保存時に `qr.png` を出す（`scripts.publish`、`scripts.explore_route --name`）。
   フロントの公開完了画面で出す場合も同じ URL を QR にする。
 - ID の文字は英数字・`-`・`_` のみ。
+
+## 4. 作成入力: `PlanInput`（`photos.json`）
+
+作る人が撮った写真列と出発地・目的地・命名をまとめた中間データ。バックエンドはこれだけを入口にする。
+フロントから送る場合も、CLI で作る場合も同じ形。型は backend/app/schemas/creator_input.py（TypeScript 側は後で 1:1 に合わせる）。
+
+```json
+{
+  "version": 1,
+  "name": "四天王寺→てんしば",
+  "origin": "四天王寺 南大門",
+  "destination": { "query": "現在地", "lat": 34.6485, "lng": 135.5110 },
+  "creator_id": "c_3f9a…",
+  "created_at": "2026-10-25T10:12:00+09:00",
+  "photos": [
+    { "id": "9b1c", "seq": 0, "image": "photos/9b1c.jpg", "lat": 34.65268, "lng": 135.51657,
+      "accuracy_m": 8, "taken_at": "2026-10-25T10:05:31+09:00", "location_source": "gps", "caption": null }
+  ],
+  "options": { "use_vlm_on_photos": false }
+}
+```
+
+| フィールド | 必須 | 内容 |
+|---|---|---|
+| `name` | ○ | 命名。保存キー（ID はこのハッシュ） |
+| `origin`, `destination` | ○ | 地名の文字列、または `{query, lat, lng}`（現在地から、など） |
+| `creator_id` | 任意 | localStorage のランダム ID。一覧の絞り込み用 |
+| `photos[].id` | ○ | フロントの `crypto.randomUUID()` など。英数字・`-`・`_` |
+| `photos[].seq` | ○ | 撮影順。0 から連続で配列順と一致。経路はこの順に通る（順序の最適化はしない） |
+| `photos[].image` | ○ | `photos/<id>.jpg`。入力ディレクトリからの相対パス |
+| `photos[].lat`, `lng` | ○ | 撮影時の座標。無い写真は送れない（フロントで撮り直すか外す） |
+| `photos[].accuracy_m` | 任意 | Geolocation の `accuracy`。道路への吸着が大きくずれた時の警告に使う |
+| `photos[].taken_at` | 任意 | 撮影時刻（ISO 8601） |
+| `photos[].location_source` | 任意 | `gps` / `manual` / `exif`。既定 `gps` |
+| `photos[].caption` | 任意 | 作成者の一言。あれば目印文にそのまま使う |
+| `options.use_vlm_on_photos` | 任意 | 既定 false。写真地点では Street View 取得・VLM・矢印を行わず、写真をそのまま使う |
+
+- 画像の受け渡し（HTTP の場合）: `multipart/form-data` で `manifest`（上の JSON 文字列）と `photos`（ファイル）。
+  ファイル名は `<id>.jpg` に付け替えて送り、バックエンドは `photos[].image` と突き合わせる。
+- バックエンドは受信時に EXIF の回転を適用し長辺 1280px に縮小して `photos/<id>.jpg` に置き、`manifest` を `photos.json` として保存する。
+  以降の処理はこのディレクトリだけを見る。HEIC など開けない形式は受け付けない。
+- 経路は「出発地 → 写真 1 → … → 写真 n → 目的地」を区間ごとに計算して結合する。写真地点は `image_source = "creator_photo"` として写真列に入り、矢印は描かれない。
 
 ## 確認の仕方
 

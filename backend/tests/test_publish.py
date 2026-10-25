@@ -40,9 +40,9 @@ class MemoryStorage:
 def load_with_images(tmp_path: Path) -> Exploration:
     e = Exploration.model_validate_json(FIXTURE.read_text(encoding="utf-8"))
     (tmp_path / "images").mkdir()
-    (tmp_path / "images" / "000_arrow.jpg").write_bytes(b"arrow0")
+    (tmp_path / "images" / "000_arrow.png").write_bytes(b"arrow0")
     (tmp_path / "images" / "001.jpg").write_bytes(b"plain1")
-    p0 = e.points[0].model_copy(update={"image": "images/000.jpg", "arrow_image": "images/000_arrow.jpg"})
+    p0 = e.points[0].model_copy(update={"image": "images/000.jpg", "arrow_image": "images/000_arrow.png"})
     p1 = e.points[1].model_copy(update={"image": "images/001.jpg", "arrow_image": None})
     return e.model_copy(update={"points": [p0, p1]})
 
@@ -60,11 +60,11 @@ def test_矢印画像を優先して上げ_画像URL入りの写真列を保存�
 
     pid = plan_id_for("テスト経路")
     assert res.record.id == pid and res.uploaded == [0, 1] and res.skipped == []
-    assert storage.files[f"{pid}/000.jpg"] == (b"arrow0", "image/jpeg")  # 矢印入りを優先
+    assert storage.files[f"{pid}/000.png"] == (b"arrow0", "image/png")  # 矢印入りを優先（PNG のまま）
     assert storage.files[f"{pid}/001.jpg"] == (b"plain1", "image/jpeg")  # 無ければ採用画像
     saved = repo.get_by_name("テスト経路")
     assert saved is not None and saved.status == "published"
-    assert [s.image_url for s in saved.plan.steps] == [f"https://cdn.example/{pid}/000.jpg", f"https://cdn.example/{pid}/001.jpg"]
+    assert [s.image_url for s in saved.plan.steps] == [f"https://cdn.example/{pid}/000.png", f"https://cdn.example/{pid}/001.jpg"]
     assert saved.plan.steps[0].turn == e.points[0].turn and saved.plan.polyline == e.polyline
 
 

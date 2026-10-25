@@ -25,7 +25,7 @@ def test_矢印を描くと画像が変わりサイズは同じ() -> None:
     src = blank_jpeg()
     out = draw_arrow(src, [(0.5, 0.95), (0.5, 0.6), (0.2, 0.5)], "left")
     a, b = Image.open(BytesIO(src)), Image.open(BytesIO(out))
-    assert a.size == b.size
+    assert b.format == "PNG" and a.size == b.size
     assert a.tobytes() != b.tobytes()
     # 終点付近（左）に橙系の色が乗っている
     r, g, bl = b.getpixel((int(0.2 * 200), int(0.5 * 200)))
@@ -47,9 +47,10 @@ def test_VLMの経路があればそれを使う(tmp_path: Path) -> None:
     p0 = e.points[0].model_copy(update={"image": cand.image, "candidates": [cand], "chosen_candidate": 0, "turn": "right"})
     p1 = e.points[1].model_copy(update={"image": None})
     e2, stats = draw_arrows(e.model_copy(update={"points": [p0, p1]}), tmp_path)
-    assert arrow_path_for(p0) == ([(0.5, 0.9), (0.5, 0.6), (0.9, 0.5)], True)
-    assert e2.points[0].arrow_image == "images/000_arrow.jpg"
-    assert (tmp_path / "images" / "000_arrow.jpg").exists()
+    assert arrow_path_for(p0, []) == ([(0.5, 0.9), (0.5, 0.6), (0.9, 0.5)], "vlm")
+    assert e2.points[0].arrow_image == "images/000_arrow.png"
+    assert (tmp_path / "images" / "000_arrow.png").exists()
+    assert (tmp_path / "images" / "000_arrow.png").read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     assert stats.drawn == [0] and stats.with_vlm_path == [0] and stats.skipped == [1]
     assert e.points[0].arrow_image is None  # 元は変更されない
 

@@ -40,7 +40,7 @@ def _arrowhead(tip: Point, tail: Point, size: float) -> list[Point]:
 
 
 def draw_arrow(image: bytes, path: list[Point], turn: str) -> bytes:
-    """path は 0〜1 の正規化座標の点列。点を直線で結び、終点に矢じりを付けた JPEG を返す。"""
+    """path は 0〜1 の正規化座標の点列。点を直線で結び、終点に矢じりを付けた PNG を返す（矢印の縁が JPEG で滲まないように）。"""
     img = Image.open(BytesIO(image)).convert("RGB")
     w, h = img.size
     norm = path if len(path) >= 2 else default_path(turn)
@@ -63,5 +63,5 @@ def draw_arrow(image: bytes, path: list[Point], turn: str) -> bytes:
     draw.polygon(_arrowhead(tip, prev, head), fill=color)
 
     buf = BytesIO()
-    img.save(buf, format="JPEG", quality=90)
+    img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()

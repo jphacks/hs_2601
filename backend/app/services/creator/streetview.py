@@ -113,7 +113,7 @@ def fetch_point_image(
             "image_source": "street_view",
             "street_view": StreetViewMeta(
                 pano_id=meta.pano_id, date=meta.date, heading=heading, fov=opt.fov, pitch=opt.pitch,
-                copyright=meta.copyright, offset_m=back,
+                copyright=meta.copyright, offset_m=back, lat=meta.lat, lng=meta.lng,
             ),
         }
     )
@@ -237,7 +237,8 @@ def fetch_point_candidates(
         cands.append(ImageCandidate(
             image=rel, heading_mode=v.heading_mode,
             street_view=StreetViewMeta(pano_id=meta.pano_id, date=meta.date, heading=heading, fov=opt.fov,
-                                       pitch=opt.pitch, copyright=meta.copyright, offset_m=back if v.along == "in" else -back),
+                                       pitch=opt.pitch, copyright=meta.copyright, offset_m=back if v.along == "in" else -back,
+                                       lat=meta.lat, lng=meta.lng),
         ))
     if not cands:
         return p.model_copy(update={"image": None, "image_source": None, "street_view": None, "candidates": []})

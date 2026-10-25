@@ -152,8 +152,9 @@ python -m scripts.streetview --from-route ./out/cases/4 --heading approach   # �
 
 | ファイル | 内容 |
 |---|---|
-| `route.json` | `image` / `image_source` / `street_view`（pano_id、撮影年月、公式か投稿か、手前何 m か）が埋まる |
+| `route.json` | `image` / `image_source` / `street_view`（pano_id、撮影年月、公式か投稿か、手前何 m か、パノラマの緯度経度）が埋まる |
 | `images/NNN.jpg` | 640×640 の画像 |
+| `images/NNN_arrow.png` | ステップ 8 で作る矢印入り画像（PNG、劣化なし） |
 | `contact.html` | **画像一覧。** 経路順にカードで並び、曲がる方向・案内文・撮影情報を表示 |
 | `map.html` | ピンをクリックで画像 |
 
@@ -216,21 +217,37 @@ python -m scripts.landmark --from-route ./out/cases/4 --no-vlm     # VLM を使�
 - 既定は Gemini（`VLM_PROVIDER=gemini`、`VLM_MODEL=gemini-3.5-flash`）。Claude にするには `VLM_PROVIDER=claude` と `ANTHROPIC_API_KEY`。
 - 無料枠の 1 分あたり上限を避けるため、呼び出し間隔を `VLM_MIN_INTERVAL_S`（既定 4 秒）空ける。429 と 503 は待って再試行する。
 - VLM が失敗した地点や候補が無い地点は、案内文と距離からのフォールバック文になる（処理は止めない）。
-- プロンプト: `app/external/vlm/prompts/evaluate.txt`
+- プロンプト: `app/external/vlm/prompts/evaluate.txt`。画像だけでなく、経路情報と各候補の「どこからどの向きで見ているか」を文章で添える（`services/creator/vlm_context.py`）:
+  - 経路情報: 地点の緯度経度（小数 6 桁）、進入・退出方位（度と八方位）、向きの変化（右 35° など）、交差点の 60 m 手前〜40 m 先の経路の座標と進行方位。
+  - 各候補: 撮影位置の緯度経度と交差点との位置関係（手前 9 m / 曲がった先 8 m）、カメラの方位・進入方位から見た向き・画角・ピッチ、公式か投稿か、撮影年月、
+    曲がる地点の画像内座標、経路の投影線（ステップ 8 と同じ計算）。
+  - VLM には投影線を「歩行者が実際に歩く線」として信頼させ、目印は曲がる地点の近く・曲がる側から選ばせる。`arrow_path` は投影線がある画像ではそのまま写させる。
+  - プロンプトが変わったので、古い `.cache/` の結果は使われず再評価される。
+- 採用候補の決め方: まず歩ける候補（`on_walkway`）に絞り、次に経路の幾何（ステップ 8 と同じ投影）で
+  「道なりの経路が画像に見える → Google 公式撮影 → 曲がり角まで見える → 足元から始まる」の順に最良のものだけ残し、
+  その中にモデルの選択があればそれ、無ければ点数で選ぶ。歩行者の視点で曲がり角を見下ろす候補が選ばれやすくなる。
 
 `scripts.explore_route` はステップ 7 まで含めて一括実行する（キーが無ければフォールバックのみ、`--no-vlm` で明示的に省略）。
 
 ### ステップ 8: 矢印の描画
 
-採用画像に、VLM が打った点を直線で順につないだ矢印を重ね、`arrow_image` に入れる。API 不要。
+採用画像に、経路（道路の中心線）をカメラから見た形に投影した点列を矢印として重ね、`arrow_image` に入れる。API 不要。
 
 ```bash
 python -m scripts.arrow --from-route ./out/cases/4
+python -m scripts.arrow --from-route ./out/cases/4 --source vlm   # 旧方式: VLM が打った点を使う
 ```
 
+- 点列の作り方（`services/creator/arrow_geo.py`、`imaging/projection.py`）:
+  1. パノラマの位置（`street_view.lat/lng`）・向き（`heading`）・画角（`fov`）・ピッチからカメラを置く。地上高 2.5 m のピンホールと見なす。
+  2. 曲がり角の 60 m 手前〜40 m 先の経路を 2 m ごとに刻み、各点を地面として画像座標に投影する。
+  3. 画像に入る連続区間のうち、奥へ進んでいて曲がり角を含むものを選ぶ。カメラが後ろ向き・経路が映らない画像なら投影は諦める。
+  4. 経路がカメラの脇を通って枠外から入ってくる場合は枠の縁から線を始め、足元（画面中央下）を通るなら足元から伸ばす。
+  5. Douglas-Peucker で直線上の点と消失点付近の小さなブレを落とす。
+- 投影できない地点は VLM の点列（`candidates[].score.arrow_path`）、それも無ければ turn ごとの既定形で描く。実行ログの `投影 x / VLM y` で内訳が分かる。
 - 色: 左 橙 / 右 紫 / 直進 青 / 到着 赤。単色で縁取りなし。
-- 左右折なのに経路が曲がっていなければ、終点をその側へ寄せて必ず曲線にする。
-- VLM の経路が無い地点は turn ごとの既定形で描く。
+- 既知の限界: 広場や公園では経路のポリラインが粗く、投影した線が実際の歩道からずれることがある。
+  パノラマの位置が無い古い `route.json` は `offset_m` から位置を推定する（精度は落ちる）。
 - `contact.html` と `map.html` は矢印入り画像を優先して表示する。`scripts.explore_route` はここまで一括で実行する。
 
 ### ステップ 9: 写真列の保存（Supabase、命名をキーに）
@@ -305,7 +322,7 @@ explorer.exe out/cases/5/qr.png
 | 出力 | 内容 |
 |---|---|
 | `route_plans` の 1 行 | `id`（命名の SHA-256 先頭 12 桁）、`name`、`status`、`plan_json`（ステップ配列 + ポリライン） |
-| `plans/<id>/NNN.jpg` | 矢印入り画像（無い地点は採用画像）。公開 URL が `plan_json.steps[].image_url` に入る |
+| `plans/<id>/NNN.png` / `NNN.jpg` | 矢印入り画像（PNG）。無い地点は採用画像（JPEG）。公開 URL が `plan_json.steps[].image_url` に入る |
 | `<dir>/published.json` | 保存内容の控え |
 
 - **同じ `--name` で実行し直すと同じ ID に上書きされる。** 別の道案内として残したいときは名前を変えるか `--id` を指定する。
@@ -358,7 +375,8 @@ app/
 │       ├── routes.py      # Routes API クライアント
 │       └── street_view.py # Street View Metadata / Static API クライアント
 ├── imaging/
-│   ├── arrow.py         # 曲線の矢印を描く（Pillow、純粋な描画）
+│   ├── arrow.py         # 矢印を描く（Pillow、純粋な描画）
+│   ├── projection.py    # 地面の点をカメラ画像の座標に投影する（ピンホール）
 │   └── qr.py            # QR の生成（segno）と読み取り（zxing-cpp）
 ├── external/supabase/
 │   └── rest.py          # PostgREST / Storage クライアント（httpx）
@@ -382,8 +400,10 @@ app/
 │   ├── photos_map.py # 写真順の地図
 │   ├── fake_photos.py # テスト用: Street View で作成者写真を模倣
     │   ├── streetview.py # ステップ 5: 画像取得（公式パノラマ優先、候補を複数）
+    │   ├── vlm_context.py # ステップ 7: 経路情報・撮影位置・投影線をプロンプト用の文章にする
     │   ├── landmark.py  # ステップ 7: VLM 採点 → 1 枚選定 → 目印文・矢印経路
-    │   ├── arrow.py     # ステップ 8: 矢印入り画像
+    │   ├── arrow_geo.py # ステップ 8: 経路を画像に投影して道なりの点列を作る
+    │   ├── arrow.py     # ステップ 8: 矢印入り画像（投影 → VLM → 既定形の順で点列を選ぶ）
 │   ├── publish.py   # ステップ 9: 写真列を公開形式にして DB・ストレージへ保存
 │   ├── qr.py        # ステップ 10: 参加者 URL の QR を qr.png に出す
     │   ├── cache.py     # 外部 API レスポンスのファイルキャッシュ

@@ -1,7 +1,7 @@
 """ステップ 9: 出力ディレクトリの写真列を、命名をキーにして DB とストレージへ保存する。
 
 - 公開 ID は命名の SHA-256 先頭 12 桁（``plan_id_for``）。同じ名前なら同じ ID で上書きされる。
-- 画像は矢印入り（``arrow_image``）を優先し、無ければ採用画像（``image``）。``plans/{id}/NNN.jpg`` に置く。
+- 画像は矢印入り（``arrow_image``）を優先し、無ければ採用画像（``image``）。``plans/{id}/NNN.<拡張子>`` に置く（矢印入りは PNG、採用画像そのままなら JPEG）。
 - 元の Exploration は変更しない。
 """
 from __future__ import annotations
