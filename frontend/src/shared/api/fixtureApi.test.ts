@@ -120,7 +120,7 @@ describe('目的地の省略', () => {
     expect((await api.getRoutePlan(second.routeId)).destination).toBe('最後の写真の地点')
   })
 
-  it('下書きからは写真を外せ、公開中は作り直しも写真を外すこともできない', async () => {
+  it('写真は下書きからも公開中からも外せるが、公開中の作り直しはできない', async () => {
     const { api, advance } = apiWithClock()
     const { jobId, routeId } = await api.createRoute(input())
     advance(1000)
@@ -134,9 +134,10 @@ describe('目的地の省略', () => {
     expect(after.plan.steps).toHaveLength(n - 1)
 
     await api.publishRoute(routeId)
-    const published = await api.getRoutePlan(routeId)
-    await expect(api.removeSteps(routeId, 'c1', [0])).rejects.toMatchObject({ status: 409 })
-    await expect(api.createRoute(input())).rejects.toMatchObject({ status: 409 })
-    expect(await api.getRoutePlan(routeId)).toEqual(published)
+    const fromPublished = await api.removeSteps(routeId, 'c1', [0]) // 公開中からも外せる（公開のまま）
+    expect(fromPublished.status).toBe('published')
+    expect(fromPublished.plan.steps).toHaveLength(n - 2)
+    await expect(api.createRoute(input())).rejects.toMatchObject({ status: 409 }) // 作り直しはできない
+    expect(await api.getRoutePlan(routeId)).toEqual(fromPublished)
   })
 })

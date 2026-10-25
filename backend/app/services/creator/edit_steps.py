@@ -1,4 +1,4 @@
-"""下書きの写真列から地点（写真）を選んで外す。公開中の道案内は変えない。
+"""写真列から地点（写真）を選んで外す。公開中の道案内からも外せる（公開のまま）。
 
 - 外した地点の「次まで」の距離は、直前に残る地点へ足す（歩く距離は変わらない）。
 - ゴール（最後の地点）は外せない。外すと道案内として終わらなくなるため。
@@ -7,7 +7,22 @@
 """
 from __future__ import annotations
 
-from app.schemas.route_plan import RoutePlan, RouteStep
+from datetime import datetime, timezone
+from pathlib import Path
+
+from app.schemas.route_plan import RoutePlan, RoutePlanRecord, RouteStep
+
+
+BACKUP_DIR = "backups"
+
+
+def backup_record(rec: RoutePlanRecord, work_root: Path) -> Path:
+    """外す前の行を <work_root>/<id>/backups/<日時>.json に残す（公開中の写真列を戻せるように）。"""
+    d = work_root / rec.id / BACKUP_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}.json"
+    path.write_text(rec.model_dump_json(indent=2), encoding="utf-8")
+    return path
 
 
 class StepEditError(ValueError):

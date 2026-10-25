@@ -7,7 +7,7 @@ interface Props {
   record: RoutePlanRecord
   onPublish: () => void
   onEdit: () => void
-  /** 写真を外した後の行。下書きのときだけ使う */
+  /** 写真を外した後の行 */
   onRecordChange: (record: RoutePlanRecord) => void
 }
 
@@ -31,11 +31,7 @@ export function RouteDetail({ record, onPublish, onEdit, onRecordChange }: Props
 
       <RoutePlanViewer key={record.plan.steps.length} plan={record.plan} />
 
-      {record.status === 'draft' ? (
-        <StepRemover record={record} onRemoved={onRecordChange} />
-      ) : (
-        <p className="text-sm text-stone-500">公開中の道案内は、写真を外したり作り直したりできません。</p>
-      )}
+      <StepRemover record={record} onRemoved={onRecordChange} />
 
       <button className={buttonClass} onClick={onPublish}>
         公開画面へ

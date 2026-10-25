@@ -192,9 +192,6 @@ export function createFixtureApi(options: FixtureApiOptions = {}): RouteApi {
 
     async removeSteps(routeId, creatorId, indices) {
       const stored = requireStored(routeId)
-      if (stored.record.status !== 'draft') {
-        throw new ApiError(409, { detail: '公開中の道案内は変更できません。' })
-      }
       if (stored.creatorId === undefined || stored.creatorId !== creatorId) {
         throw new ApiError(403, { detail: 'この道案内は編集できません（作った人だけが編集できます）。' })
       }

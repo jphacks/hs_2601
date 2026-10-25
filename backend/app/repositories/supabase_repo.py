@@ -54,9 +54,10 @@ class SupabaseRoutePlanRepository:
         rows = self._rest.update(TABLE, {"id": f"eq.{plan_id}"}, {"status": status})
         return row_to_record(rows[0]) if rows else None
 
-    def update_draft_plan(self, plan_id: str, plan: RoutePlan) -> RoutePlanRecord | None:
-        # status=eq.draft を条件に入れ、確認と書き換えの間に公開されても公開中の行は書き換えない
-        rows = self._rest.update(TABLE, {"id": f"eq.{plan_id}", "status": "eq.draft"}, {"plan_json": plan.model_dump(mode="json")})
+    def update_plan(self, plan_id: str, plan: RoutePlan, expected_status: PlanStatus) -> RoutePlanRecord | None:
+        # 確かめたときと同じ status を条件に入れ、間に状態が変わっていたら書き換えない
+        rows = self._rest.update(TABLE, {"id": f"eq.{plan_id}", "status": f"eq.{expected_status}"},
+                                 {"plan_json": plan.model_dump(mode="json")})
         return row_to_record(rows[0]) if rows else None
 
 

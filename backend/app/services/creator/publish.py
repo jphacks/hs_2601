@@ -50,7 +50,8 @@ def upload_point_image(storage: PhotoStorage, plan_id: str, p: ExplorationPoint,
 
 def to_step(p: ExplorationPoint, image_url: str | None) -> RouteStep:
     return RouteStep(index=p.index, lat=p.lat, lng=p.lng, turn=p.turn, instruction=p.instruction,
-                     landmark=p.landmark, distance_to_next_m=p.distance_to_next_m, image_url=image_url)
+                     landmark=p.landmark, distance_to_next_m=p.distance_to_next_m, image_url=image_url,
+                     creator_photo=p.image_source == "creator_photo")
 
 
 def publish_plan(

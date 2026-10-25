@@ -38,6 +38,7 @@ class RouteStep(BaseModel):
     landmark: str | None = None
     distance_to_next_m: int = Field(ge=0)
     image_url: str | None = None  # 矢印入り画像の公開 URL。画像が無い地点は null
+    creator_photo: bool = False  # 作成者が撮った写真（左折・右折などの表示を出さない）
 
 
 class RoutePlan(BaseModel):

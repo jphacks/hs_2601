@@ -11,6 +11,8 @@ interface Props {
 export function StepView({ step, stepNumber }: Props) {
   const arrived = step.turn === 'arrive'
   const description = step.landmark ?? step.instruction
+  // 作成者の写真は写真とメッセージだけを見せる（左折・右折の表示は出さない。ゴールは出す）
+  const showTurn = !step.creator_photo || arrived
 
   return (
     <section className="rounded-[20px] bg-white p-3 shadow-[0_4px_18px_#17291a0d]">
@@ -32,12 +34,14 @@ export function StepView({ step, stepNumber }: Props) {
       </div>
 
       <div className="flex items-center gap-3.5 px-2 py-[22px]">
-        <div className="flex h-[82px] w-[82px] shrink-0 items-center justify-center rounded-[20px] bg-brand text-5xl font-bold text-white">
-          {TURN_ARROW[step.turn]}
-        </div>
+        {showTurn && (
+          <div className="flex h-[82px] w-[82px] shrink-0 items-center justify-center rounded-[20px] bg-brand text-5xl font-bold text-white">
+            {TURN_ARROW[step.turn]}
+          </div>
+        )}
         <div>
-          <h2 className="m-0 text-[25px] leading-[1.3] text-brand">{TURN_LABEL[step.turn]}</h2>
-          <p className="mt-2 mb-0 text-sm leading-[1.8] text-ink-soft">{description}</p>
+          {showTurn && <h2 className="m-0 text-[25px] leading-[1.3] text-brand">{TURN_LABEL[step.turn]}</h2>}
+          <p className={`${showTurn ? 'mt-2' : 'mt-0 text-base'} mb-0 text-sm leading-[1.8] text-ink-soft`}>{description}</p>
         </div>
       </div>
 

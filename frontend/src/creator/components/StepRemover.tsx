@@ -8,7 +8,7 @@ interface Props {
   onRemoved: (record: RoutePlanRecord) => void
 }
 
-/** 下書きの写真列から、要らない写真を選んで外す。ゴールの写真は外せない。公開中は出さない */
+/** 写真列から、要らない写真を選んで外す。ゴールの写真は外せない。公開中なら参加者の画面からも消える */
 export function StepRemover({ record, onRemoved }: Props) {
   const removal = useStepRemoval(record)
   const steps = record.plan.steps
@@ -16,7 +16,8 @@ export function StepRemover({ record, onRemoved }: Props) {
   const count = removal.selected.size
 
   async function handleRemove() {
-    if (!window.confirm(`選んだ ${count} 枚の写真を道案内から外します。よろしいですか？`)) return
+    const published = record.status === 'published' ? '公開中なので、参加者の画面からもすぐに消えます。' : ''
+    if (!window.confirm(`選んだ ${count} 枚の写真を道案内から外します。${published}よろしいですか？`)) return
     const updated = await removal.remove()
     if (updated) onRemoved(updated)
   }

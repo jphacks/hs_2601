@@ -17,6 +17,8 @@ export interface RouteStep {
   distance_to_next_m: number
   /** 矢印入り画像の公開 URL。画像が無い地点は null */
   image_url: string | null
+  /** 作成者が撮った写真。左折・右折などの表示を出さない（古い行には無い） */
+  creator_photo?: boolean
 }
 
 export interface RoutePlan {

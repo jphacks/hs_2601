@@ -164,7 +164,7 @@ def test_公開中の道案内は上書きせず_画像も上げない(tmp_path:
     assert repo.get_by_id(published.id) == published  # 行もそのまま（公開のまま）
 
 
-def test_Supabaseの下書き更新は_下書きの行だけを条件にplan_jsonを書き換える(tmp_path: Path) -> None:
+def test_Supabaseの写真列更新は_確かめたstatusを条件にplan_jsonだけを書き換える(tmp_path: Path) -> None:
     import json
 
     from app.schemas.route_plan import RoutePlan
@@ -176,6 +176,6 @@ def test_Supabaseの下書き更新は_下書きの行だけを条件にplan_jso
 
     rest = SupabaseRest("https://p.supabase.co", "k", http=httpx.Client(transport=httpx.MockTransport(handler)))
     plan = RoutePlan(origin="a", destination="b", polyline="", total_distance_m=0, steps=[])
-    assert SupabaseRoutePlanRepository(rest).update_draft_plan("abc123def456", plan) is None
-    assert seen["method"] == "PATCH" and seen["params"] == {"id": "eq.abc123def456", "status": "eq.draft"}
+    assert SupabaseRoutePlanRepository(rest).update_plan("abc123def456", plan, "published") is None
+    assert seen["method"] == "PATCH" and seen["params"] == {"id": "eq.abc123def456", "status": "eq.published"}
     assert set(seen["body"]) == {"plan_json"}

@@ -18,8 +18,8 @@ export interface RouteApi {
   /** 詳細取得: 道案内 ID → 写真列 JSON（作る人の確認画面用。下書きも返す） */
   getRoutePlan(routeId: string): Promise<RoutePlanRecord>
   /**
-   * 写真を外す: 下書きの写真列から、並び順（0 始まり）で選んだ地点を外す。更新後の行を返す。
-   * 公開中の道案内・ゴールの写真・他の作成者の道案内は変えない（エラーになる）
+   * 写真を外す: 写真列から、並び順（0 始まり）で選んだ地点を外す。公開中でも外せる（公開のまま）。
+   * ゴールの写真・他の作成者の道案内は変えない（エラーになる）
    */
   removeSteps(routeId: string, creatorId: string, indices: number[]): Promise<RoutePlanRecord>
   /** 公開: 道案内 ID → 公開 URL */

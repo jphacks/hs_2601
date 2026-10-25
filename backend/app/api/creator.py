@@ -28,7 +28,7 @@ from app.schemas.creator_api import CreateRouteResponse, JobStatus, PublishRespo
 from app.schemas.creator_input import PlanInput
 from app.schemas.route_plan import RoutePlanRecord, plan_id_for, validate_plan_id
 from app.services.creator.creation import CreationJob, PipelineRunner, run_creation_job
-from app.services.creator.edit_steps import StepEditError, remove_steps
+from app.services.creator.edit_steps import StepEditError, backup_record, remove_steps
 from app.services.creator.snapshot import write_map_png
 from app.services.creator.intake import (
     MAX_PHOTO_BYTES, UploadedPhoto, match_photos, normalize_photos, parse_manifest, write_work_dir,
@@ -142,21 +142,21 @@ def get_route(plan_id: str, repo: RoutePlanRepository = Depends(get_admin_repo))
 
 @router.post("/routes/{plan_id}/steps/remove", response_model=RoutePlanRecord)
 def remove_route_steps(plan_id: str, body: RemoveStepsRequest,
-                       repo: RoutePlanRepository = Depends(get_admin_repo)) -> RoutePlanRecord:
-    """下書きの写真列から写真（地点）を外す。公開中の道案内は変えない（409）。"""
+                       repo: RoutePlanRepository = Depends(get_admin_repo),
+                       work_root: Path = Depends(get_work_root)) -> RoutePlanRecord:
+    """写真列から写真（地点）を外す。公開中でも外せる（公開のまま）。外す前の行は作業ディレクトリに控えを残す。"""
     rec = _load(plan_id, repo)
-    if rec.status != "draft":
-        raise HTTPException(409, "公開中の道案内は変更できません。")
     if rec.creator_id is None or rec.creator_id != body.creator_id.strip():
         raise HTTPException(403, "この道案内は編集できません（作った人だけが編集できます）。")
     try:
         plan = remove_steps(rec.plan, body.indices)
     except StepEditError as e:
         raise HTTPException(400, str(e)) from e
+    backup_record(rec, work_root)
     with supabase_errors():
-        saved = repo.update_draft_plan(rec.id, plan)
-    if saved is None:  # 確かめた後に公開された・消えた
-        raise HTTPException(409, "公開中の道案内は変更できません。")
+        saved = repo.update_plan(rec.id, plan, rec.status)
+    if saved is None:  # 確かめた後に公開・非公開が変わった、または消えた
+        raise HTTPException(409, "道案内の状態が変わりました。画面を読み込み直してください。")
     return saved
 
 

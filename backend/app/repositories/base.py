@@ -23,8 +23,8 @@ class RoutePlanRepository(Protocol):
         """status だけを変える。行が無ければ None。"""
         ...
 
-    def update_draft_plan(self, plan_id: str, plan: RoutePlan) -> RoutePlanRecord | None:
-        """下書き（status = draft）の行だけ plan を書き換える。公開中・行なしなら何もせず None。"""
+    def update_plan(self, plan_id: str, plan: RoutePlan, expected_status: PlanStatus) -> RoutePlanRecord | None:
+        """status が expected_status の行だけ plan を書き換える（status は変えない）。合わなければ None。"""
         ...
 
 

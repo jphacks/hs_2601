@@ -57,9 +57,9 @@ class MemoryRepo:
         self.rows[plan_id] = rec.model_copy(update={"status": status})
         return self.rows[plan_id]
 
-    def update_draft_plan(self, plan_id: str, plan) -> RoutePlanRecord | None:  # noqa: ANN001
+    def update_plan(self, plan_id: str, plan, expected_status: str) -> RoutePlanRecord | None:  # noqa: ANN001
         rec = self.rows.get(plan_id)
-        if rec is None or rec.status != "draft":
+        if rec is None or rec.status != expected_status:
             return None
         self.rows[plan_id] = rec.model_copy(update={"plan": plan})
         return self.rows[plan_id]
@@ -317,12 +317,16 @@ def test_ゴールは外せず_範囲外や空は400(ctx: Ctx) -> None:
     assert len(ctx.repo.rows[RID].plan.steps) == 3
 
 
-def test_公開中の道案内からは外せない(ctx: Ctx) -> None:
+def test_公開中の道案内からも外せ_公開のまま_外す前の控えが残る(ctx: Ctx) -> None:
     _draft_with_steps(ctx, [100, 20, 0])
     assert ctx.client.post(f"/api/routes/{RID}/publish").status_code == 200
     before = ctx.repo.rows[RID]
     res = _remove(ctx, [1])
-    assert res.status_code == 409 and ctx.repo.rows[RID] == before
+    assert res.status_code == 200, res.text
+    after = ctx.repo.rows[RID]
+    assert after.status == "published" and len(after.plan.steps) == 2
+    backups = list((ctx.work_root / RID / "backups").glob("*.json"))
+    assert len(backups) == 1 and RoutePlanRecord.model_validate_json(backups[0].read_text(encoding="utf-8")) == before
 
 
 def test_他の作成者は外せない(ctx: Ctx) -> None:
