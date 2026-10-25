@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.external.google.geocoding import GeocodingClient, parse_geocode_response
+from app.schemas.creator_input import PlaceInput
 from app.schemas.exploration import Place
 from app.services.creator.cache import FileCache, cache_key
 
@@ -42,3 +43,14 @@ def geocode_from_raw(raw: dict[str, Any]) -> GeocodeOutput:
         for q, body in raw.items()
     ]
     return GeocodeOutput(places=places, raw=raw)
+
+
+def resolve_places(places: list[PlaceInput], client: GeocodingClient | None, cache: FileCache | None = None) -> list[Place]:
+    """座標付きはそのまま、無ければ Geocoding。座標が全部あれば ``client`` は None でよい。"""
+    need = [p.query for p in places if p.lat is None]
+    found: dict[str, Place] = {}
+    if need:
+        if client is None:
+            raise ValueError(f"座標の無い地名があるのに Geocoding クライアントがありません: {need}")
+        found = {pl.query: pl for pl in geocode_queries(client, need, cache).places}
+    return [Place(query=p.query, lat=p.lat, lng=p.lng) if p.lat is not None else found[p.query] for p in places]

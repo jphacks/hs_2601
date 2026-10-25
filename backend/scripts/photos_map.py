@@ -15,19 +15,16 @@ from app.external.google.geocoding import GeocodingClient
 from app.schemas.creator_input import PlaceInput
 from app.schemas.exploration import Place
 from app.services.creator.cache import FileCache
-from app.services.creator.geocode import geocode_queries
+from app.services.creator.geocode import resolve_places as resolve_place_inputs
 from app.services.creator.photos import load_plan_input
 from app.services.creator.photos_map import render_photos_map
 
 
 def resolve_places(places: list[PlaceInput], cache: FileCache | None) -> list[Place]:
-    """座標付きはそのまま、無ければ Geocoding。"""
-    need = [p.query for p in places if p.lat is None]
-    found: dict[str, Place] = {}
-    if need:
-        geo = geocode_queries(GeocodingClient(get_settings().require_google_maps_api_key()), need, cache)
-        found = {pl.query: pl for pl in geo.places}
-    return [Place(query=p.query, lat=p.lat, lng=p.lng) if p.lat is not None else found[p.query] for p in places]
+    """座標付きはそのまま、無ければ Geocoding（キーは必要になったときだけ読む）。"""
+    need = any(p.lat is None for p in places)
+    client = GeocodingClient(get_settings().require_google_maps_api_key()) if need else None
+    return resolve_place_inputs(places, client, cache)
 
 
 def main() -> None:

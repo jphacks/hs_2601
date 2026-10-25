@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app.repositories.base import PhotoStorage, RoutePlanRepository
 from app.schemas.exploration import Exploration, ExplorationPoint
-from app.schemas.route_plan import RoutePlan, RoutePlanRecord, RouteStep, plan_id_for, validate_plan_id
+from app.schemas.route_plan import PlanStatus, RoutePlan, RoutePlanRecord, RouteStep, plan_id_for, validate_plan_id
 
 CONTENT_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 
@@ -50,8 +50,10 @@ def to_step(p: ExplorationPoint, image_url: str | None) -> RouteStep:
 
 
 def publish_plan(
-    e: Exploration, out_dir: Path, name: str, repo: RoutePlanRepository, storage: PhotoStorage, *, plan_id: str | None = None
+    e: Exploration, out_dir: Path, name: str, repo: RoutePlanRepository, storage: PhotoStorage, *, plan_id: str | None = None,
+    status: PlanStatus = "published", creator_id: str | None = None,
 ) -> PublishResult:
+    """``status`` は CLI では公開済み、作る人 API では下書き（公開は別の API で行う）。"""
     name = name.strip()
     if not name:
         raise ValueError("命名（--name）が空です。")
@@ -68,5 +70,6 @@ def publish_plan(
         steps.append(to_step(p, url))
     plan = RoutePlan(origin=e.origin.query, destination=e.destination.query, polyline=e.polyline,
                      total_distance_m=e.total_distance_m, steps=steps)
-    record = repo.save(RoutePlanRecord(id=pid, name=name, origin=e.origin.query, destination=e.destination.query, plan=plan))
+    record = repo.save(RoutePlanRecord(id=pid, name=name, status=status, origin=e.origin.query, destination=e.destination.query,
+                                       plan=plan, creator_id=creator_id))
     return PublishResult(record, uploaded, skipped)

@@ -354,6 +354,45 @@ python -m scripts.show_plan --qr ./out/cases/6/qr.png
 - 同じ場所の写真など経路が取れない区間は飛ばして警告に残し、その写真は前の写真に統合する。
 - 出力は通常と同じ構成に `photos/`、`photos.json`、`legs/NN.json`（区間ごとの生レスポンス）、`photos_map.html` が加わる。
 
+### ステップ 13: 作る人の HTTP API（フロントから作成・公開）
+
+契約は [docs/interface.md](../docs/interface.md) 5 章。ステップ 12 と同じ処理（`app/services/creator/pipeline.py`、CLI と共通）を HTTP から回す。
+
+```bash
+# 0. 初回のみ: route_plans に creator_id 列を足す（supabase/migrations/20261025120000_route_plans_creator.sql）
+#    未適用だと作成ジョブの保存と一覧が失敗する
+# 1. 起動（GOOGLE_MAPS_API_KEY・SUPABASE_URL・SUPABASE_SERVICE_ROLE_KEY が必要。PUBLIC_BASE_URL は任意）
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# 2. 作成受付（manifest = photos.json の中身、photos = <id>.jpg）。202 {"jobId", "routeId"}
+curl -s -F "manifest=<./out/cases/6/photos.json" \
+     $(for f in ./out/cases/6/photos/*.jpg; do printf -- '-F photos=@%s ' "$f"; done) \
+     http://localhost:8000/api/routes
+# 写真 0 枚なら manifest だけ（photos は [] にする）
+
+# 3. 進み具合（state: running / done / failed、step: geocode / route / streetview / landmark / arrow / save）
+curl -s http://localhost:8000/api/jobs/<jobId>
+
+# 4. 一覧（作成者 ID 必須、新しい順）と詳細（下書きも見える）
+curl -s "http://localhost:8000/api/routes?creator_id=<creator_id>"
+curl -s http://localhost:8000/api/routes/<routeId>
+
+# 5. 公開（status = published）と QR
+curl -s -X POST http://localhost:8000/api/routes/<routeId>/publish
+curl -s -o qr.png http://localhost:8000/api/routes/<routeId>/qr.png
+```
+
+仕組み:
+
+- 受付時に manifest と写真ファイルを突き合わせ（過不足・開けない画像は 400）、写真は EXIF 回転・長辺 1280px の JPEG にして
+  `out/routes/<routeId>/photos/` に、manifest を `photos.json` に置く（前回の出力は消す）。以降はこのディレクトリで処理する。
+- 同じ命名が別の `creator_id` で保存済みなら 409（CLI で作った `creator_id` の無い行も別人扱い）。同じ道案内を作成中のときも 409。
+- 処理はバックグラウンドのスレッドで走り、ジョブの状態はメモリに持つ（`app/services/creator/jobs.py`。再起動で消える）。
+  終わると `status = "draft"` で保存され、公開 API で `published` になる。失敗時は利用者向けの文を `message` に入れ、詳細はサーバーログに出す。
+- 参加者 URL は `{PUBLIC_BASE_URL}/r/{id}`。`PUBLIC_BASE_URL` が無ければこのサーバー自身の URL（`/r/{id}` の HTML 表示）にする。
+- 依存（リポジトリ・ストレージ・パイプライン・ジョブ置き場・作業ディレクトリ）は `app/api/deps.py` にあり、
+  テストは `app.dependency_overrides` でメモリ実装に差し替える（`tests/test_creator_api.py`）。
+
 ## 構成
 
 ```

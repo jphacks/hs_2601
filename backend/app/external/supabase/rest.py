@@ -45,6 +45,12 @@ class SupabaseRest:
                             params={"select": columns, **filters}, headers=self._headers)
         return self._json(res, f"select {table}")
 
+    def update(self, table: str, filters: dict[str, str], values: dict[str, Any]) -> list[dict[str, Any]]:
+        """``filters`` に合う行の ``values`` の列だけを書き換え、更新後の行を返す（合う行が無ければ空）。"""
+        res = self._request("PATCH", f"{self._url}/rest/v1/{table}", f"update {table}", params=filters,
+                            headers={**self._headers, "Prefer": "return=representation"}, json=values)
+        return self._json(res, f"update {table}")
+
     # --- Storage ---
 
     def upload(self, bucket: str, path: str, data: bytes, content_type: str, *, upsert: bool = True) -> str:
