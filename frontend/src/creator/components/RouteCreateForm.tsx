@@ -1,34 +1,47 @@
 import { useRef } from 'react'
+import type { SubmitPhase } from '../hooks/useCreateRoute'
 import type { CapturedPhoto } from '../types'
 import { PhotoGrid } from './PhotoGrid'
 import { buttonClass, inputClass, secondaryClass } from './styles'
 
 interface Props {
+  name: string
   origin: string
   destination: string
   photos: CapturedPhoto[]
   /** 検証・通信エラー。なければ null */
   error: string | null
-  submitting: boolean
+  phase: SubmitPhase
+  onNameChange: (value: string) => void
   onOriginChange: (value: string) => void
   onDestinationChange: (value: string) => void
   onAddPhotos: (files: FileList | null) => void
   onRemovePhoto: (photo: CapturedPhoto) => void
+  onRetryLocation: (photo: CapturedPhoto) => void
   onSubmit: () => void
   onCancel: () => void
 }
 
-/** 「道を作る」画面。出発地・目的地の入力と目印写真の追加 */
+/** 「道を作る」画面。命名・出発地・目的地の入力と目印写真の追加 */
+const SUBMIT_LABEL: Record<SubmitPhase, string> = {
+  idle: '道案内を作成する',
+  converting: '写真を準備中...',
+  uploading: '送信中...',
+}
+
 export function RouteCreateForm({
+  name,
   origin,
   destination,
   photos,
   error,
-  submitting,
+  phase,
+  onNameChange,
   onOriginChange,
   onDestinationChange,
   onAddPhotos,
   onRemovePhoto,
+  onRetryLocation,
   onSubmit,
   onCancel,
 }: Props) {
@@ -42,6 +55,20 @@ export function RouteCreateForm({
   return (
     <section className="space-y-5">
       <h1 className="text-2xl font-bold">道を作る</h1>
+      <label className="block space-y-2">
+        <span className="text-sm font-semibold">道の名前</span>
+        <input
+          className={inputClass}
+          value={name}
+          required
+          maxLength={100}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="例：広島駅→平和記念公園"
+        />
+        <span className="block text-xs text-stone-500">
+          同じ名前で作り直すと、前に作った道を上書きします。
+        </span>
+      </label>
       <label className="block space-y-2">
         <span className="text-sm font-semibold">出発地</span>
         <input
@@ -83,7 +110,7 @@ export function RouteCreateForm({
           📷 写真を撮る・追加する
         </button>
 
-        <PhotoGrid photos={photos} onRemove={onRemovePhoto} />
+        <PhotoGrid photos={photos} onRemove={onRemovePhoto} onRetryLocation={onRetryLocation} />
       </div>
 
       {error && (
@@ -92,8 +119,12 @@ export function RouteCreateForm({
         </p>
       )}
 
-      <button className={`${buttonClass} disabled:opacity-50`} disabled={submitting} onClick={onSubmit}>
-        {submitting ? '送信中...' : '道案内を作成する'}
+      <button
+        className={`${buttonClass} disabled:opacity-50`}
+        disabled={phase !== 'idle'}
+        onClick={onSubmit}
+      >
+        {SUBMIT_LABEL[phase]}
       </button>
       <button className={secondaryClass} onClick={onCancel}>
         キャンセル

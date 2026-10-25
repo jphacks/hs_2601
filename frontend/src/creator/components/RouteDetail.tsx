@@ -14,6 +14,8 @@ export function RouteDetail({ record, onPublish, onEdit }: Props) {
     <section className="space-y-5">
       <h1 className="text-2xl font-bold">道案内の確認</h1>
       <div className="rounded-2xl border bg-white p-4">
+        <p className="text-lg font-bold break-all">{record.name}</p>
+        <p className="mb-3 font-mono text-xs text-stone-500">ID: {record.id}</p>
         <p className="text-sm text-stone-500">出発地</p>
         <p className="font-semibold">{record.origin}</p>
         <p className="my-2 text-emerald-700">↓</p>

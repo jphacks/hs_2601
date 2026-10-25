@@ -6,15 +6,13 @@ import { useRouteList } from '../hooks/useRouteList'
 /** 公開完了画面に navigate state で渡す値 */
 export interface PublishedState {
   results: PublishResult[]
+  /** routeId → 道の名前 */
   labels: Record<string, string>
 }
 
 function labelsFor(routes: RouteSummary[], results: PublishResult[]): Record<string, string> {
   return Object.fromEntries(
-    results.map((r) => {
-      const route = routes.find((x) => x.id === r.routeId)
-      return [r.routeId, route ? `${route.origin} → ${route.destination}` : r.routeId]
-    }),
+    results.map((r) => [r.routeId, routes.find((x) => x.id === r.routeId)?.name ?? r.routeId]),
   )
 }
 
