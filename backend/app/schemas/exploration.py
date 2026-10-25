@@ -62,7 +62,7 @@ class ImageCandidate(BaseModel):
     """1 地点に対する Street View の候補画像。向き・位置の違いで複数作る。"""
 
     image: str  # out/ からの相対パス
-    heading_mode: str  # approach / bisector / departure
+    heading_mode: str  # travel（経路の進行方向・既定）/ 経路なしの旧方式: approach / bisector / departure
     street_view: StreetViewMeta
     score: VlmScore | None = None  # ステップ 7 で埋まる
 

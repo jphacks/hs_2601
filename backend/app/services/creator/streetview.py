@@ -16,7 +16,8 @@ from typing import Literal
 from app.external.google.street_view import PanoMeta, StreetViewClient
 from app.schemas.exploration import Exploration, ExplorationPoint, ImageCandidate, StreetViewMeta
 from app.services.creator.cache import FileCache, cache_key
-from app.services.creator.geo import destination_point, heading_diff_deg
+from app.services.creator.geo import LatLngT, destination_point, heading_diff_deg, point_at, project_to_path, travel_heading
+from app.services.creator.route import decode_polyline
 
 IMAGE_DIR = "images"
 
@@ -200,12 +201,100 @@ def variants_for(p: ExplorationPoint) -> tuple[Variant, ...]:
     return TURN_VARIANTS
 
 
+# ---------------------------------------------------------------------------
+# 進行方向の候補（経路があるときの既定）
+#   - カメラは「その場所で歩く向き」だけを向く。曲がる先へ回したり、曲がった先から振り返ったりしない。
+#   - 撮影地点は経路の上（ON_ROUTE_M 以内）で、曲がり角より手前のものだけ。
+#   これで写真の向きと経路の投影（矢印）が一致し、矢印が道から外れにくくなる。
+# ---------------------------------------------------------------------------
+
+TRAVEL_MODE = "travel"
+ON_ROUTE_M = 8.0  # パノラマの撮影位置が経路からこれ以上離れていれば使わない（別の道・建物内など）
+PAST_CORNER_M = 2.0  # 曲がり角をこれ以上越えた位置のパノラマは使わない
+SEARCH_RADIUS_M = 15  # Metadata API の探索半径。大きいと別の道のパノラマを拾う
+# 曲がり角・到着点の何 m 手前から撮るか（上から順に試す）。近すぎると曲がる先が枠外になる
+TRAVEL_BEFORE_M: tuple[float, ...] = (10.0, 15.0, 20.0, 6.0, 25.0, 30.0, 3.0, 40.0, 50.0, 60.0)
+# 出発点は前方へ進みながら撮る
+TRAVEL_AFTER_START_M: tuple[float, ...] = (0.0, 5.0, 10.0, 15.0, 20.0, 30.0, 40.0)
+
+
+@dataclass(frozen=True)
+class TravelShot:
+    meta: PanoMeta
+    heading: float
+    before_m: float  # 曲がり角の何 m 手前か（出発点では負 = 前方）
+
+
+def travel_shots(client: StreetViewClient, p: ExplorationPoint, route: list[LatLngT], base: StreetViewOptions,
+                 target: int) -> list[TravelShot]:
+    """経路に沿って撮影位置を探し、経路上・曲がり角より手前のパノラマだけを、その場所で歩く向きで撮る。公式撮影を先に並べる。"""
+    corner_arc = project_to_path(route, (p.lat, p.lng))[1]
+    depart = p.maneuver.upper() == "DEPART"
+    arcs = [corner_arc + d for d in TRAVEL_AFTER_START_M] if depart else [corner_arc - d for d in TRAVEL_BEFORE_M]
+    shots: list[TravelShot] = []
+    seen: set[str] = set()
+    for arc in arcs:
+        if arc < 0 or len(shots) >= target * 2:
+            continue
+        lat, lng = point_at(route, arc)
+        meta = client.metadata(lat, lng, radius_m=SEARCH_RADIUS_M)
+        if meta is None or meta.pano_id in seen:
+            continue
+        seen.add(meta.pano_id)
+        off_route, pano_arc = project_to_path(route, (meta.lat, meta.lng))
+        if off_route > ON_ROUTE_M or (not depart and pano_arc > corner_arc + PAST_CORNER_M):
+            continue
+        heading = travel_heading(route, pano_arc, stop_m=None if depart else corner_arc)
+        if heading is None:
+            continue
+        shots.append(TravelShot(meta, heading, corner_arc - pano_arc))
+    official = [s for s in shots if s.meta.is_official] if base.prefer_official else shots
+    rest = [s for s in shots if s not in official]
+    return (official + rest)[:target]
+
+
+def _fetch_image(client: StreetViewClient, pano_id: str, heading: float, opt: StreetViewOptions, cache: FileCache | None) -> bytes:
+    key = cache_key("streetview", pano_id, round(heading, 1), opt.fov, opt.pitch, opt.size)
+    data = cache.get_bytes(key) if cache else None
+    if data is None:
+        data = client.image(pano_id, heading=heading, fov=opt.fov, pitch=opt.pitch, size=opt.size)
+        if cache:
+            cache.set_bytes(key, data)
+    return data
+
+
+def fetch_travel_candidates(
+    client: StreetViewClient, p: ExplorationPoint, out_dir: Path, base: StreetViewOptions, route: list[LatLngT],
+    cache: FileCache | None = None, target: int = TARGET_CANDIDATES,
+) -> ExplorationPoint:
+    """進行方向の候補だけを取る（向きは回さない）。画角・ピッチは base のまま。"""
+    opt = StreetViewOptions(**{**base.__dict__, "fov": 90, "pitch": 0})
+    cands: list[ImageCandidate] = []
+    for shot in travel_shots(client, p, route, opt, target):
+        rel = f"{IMAGE_DIR}/{p.index:03d}_c{len(cands)}.jpg"
+        (out_dir / rel).parent.mkdir(parents=True, exist_ok=True)
+        (out_dir / rel).write_bytes(_fetch_image(client, shot.meta.pano_id, shot.heading, opt, cache))
+        cands.append(ImageCandidate(
+            image=rel, heading_mode=TRAVEL_MODE,
+            street_view=StreetViewMeta(pano_id=shot.meta.pano_id, date=shot.meta.date, heading=shot.heading, fov=opt.fov,
+                                       pitch=opt.pitch, copyright=shot.meta.copyright, offset_m=round(shot.before_m, 1),
+                                       lat=shot.meta.lat, lng=shot.meta.lng),
+        ))
+    if not cands:
+        return p.model_copy(update={"image": None, "image_source": None, "street_view": None, "candidates": []})
+    first = cands[0]
+    return p.model_copy(update={
+        "image": first.image, "image_source": "street_view", "street_view": first.street_view,
+        "candidates": cands, "chosen_candidate": None,
+    })
+
+
 def fetch_point_candidates(
     client: StreetViewClient, p: ExplorationPoint, out_dir: Path, base: StreetViewOptions,
     variants: tuple[Variant, ...] | None = None, cache: FileCache | None = None,
     target: int = TARGET_CANDIDATES,
 ) -> ExplorationPoint:
-    """1 地点について variants を上から順に試し、重複を除いて target 枚まで candidates に入れる。
+    """（経路が無いときの旧方式）variants を上から順に試し、重複を除いて target 枚まで candidates に入れる。
     同じパノラマ・同じ向き・同じ画角は重複。image には先頭の候補を仮採用する。"""
     approach = p.heading if p.heading is not None else 0.0
     cands: list[ImageCandidate] = []
@@ -254,6 +343,8 @@ def fetch_candidates(
     variants: tuple[Variant, ...] | None = None, cache: FileCache | None = None,
 ) -> tuple[Exploration, StreetViewStats]:
     base = base or StreetViewOptions()
+    route = decode_polyline(e.polyline) if e.polyline else []
+    travel = variants is None and len(route) >= 2  # 経路があれば進行方向の候補だけにする（既定）
     fetched: list[int] = []
     missing: list[int] = []
     skipped: list[int] = []
@@ -263,7 +354,8 @@ def fetch_candidates(
             skipped.append(p.index)
             points.append(p)
             continue
-        q = fetch_point_candidates(client, p, out_dir, base, variants, cache)
+        q = (fetch_travel_candidates(client, p, out_dir, base, route, cache) if travel
+             else fetch_point_candidates(client, p, out_dir, base, variants, cache))
         (fetched if q.candidates else missing).append(p.index)
         points.append(q)
     return e.model_copy(update={"points": points}), StreetViewStats(fetched, missing, skipped)

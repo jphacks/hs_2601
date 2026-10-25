@@ -174,7 +174,7 @@ def test_候補は最大8枚_出発点と目的地は位置違いで複数(tmp_p
     assert variants_for(e.points[0]) is ENDPOINT_VARIANTS and variants_for(e.points[1]) is ENDPOINT_VARIANTS
     turn_pt = e.points[0].model_copy(update={"maneuver": "TURN_RIGHT", "heading_out": 170.0})
     assert variants_for(turn_pt) is TURN_VARIANTS
-    e2, _ = fetch_candidates(client, e, tmp_path)
+    e2, _ = fetch_candidates(client, e.model_copy(update={"polyline": ""}), tmp_path)  # 経路なし = 旧方式
     assert [len(p.candidates) for p in e2.points] == [8, 8]
     assert {c.image for c in e2.points[0].candidates} == {f"images/000_c{i}.jpg" for i in range(8)}
 
@@ -191,5 +191,68 @@ def test_同じパノラマからは3枚まで(tmp_path: Path) -> None:
     client = StreetViewClient("k", http=httpx.Client(transport=httpx.MockTransport(handler)))
     e = load()
     turn_pt = e.points[0].model_copy(update={"maneuver": "TURN_RIGHT", "heading_out": 170.0})
-    e2, _ = fetch_candidates(client, e.model_copy(update={"points": [turn_pt]}), tmp_path)
+    e2, _ = fetch_candidates(client, e.model_copy(update={"points": [turn_pt], "polyline": ""}), tmp_path)
     assert len(e2.points[0].candidates) == 3
+
+
+# --- 経路があるとき: 進行方向だけ・経路上・曲がり角より手前 -------------------------------------
+
+def _encode(points: list[tuple[float, float]]) -> str:
+    out, prev = [], (0, 0)
+    for lat, lng in points:
+        cur = (round(lat * 1e5), round(lng * 1e5))
+        for v in (cur[0] - prev[0], cur[1] - prev[1]):
+            v = ~(v << 1) if v < 0 else v << 1
+            while v >= 0x20:
+                out.append(chr((0x20 | (v & 0x1F)) + 63)); v >>= 5
+            out.append(chr(v + 63))
+        prev = cur
+    return "".join(out)
+
+
+CORNER = (34.70000, 135.50200)
+ROUTE = [(34.70000, 135.50000), CORNER, (34.70150, 135.50200)]  # 東へ約 180 m、角で左折して北へ
+
+
+def _turn_exploration() -> Exploration:
+    e = load()
+    p = e.points[0].model_copy(update={"maneuver": "TURN_LEFT", "lat": CORNER[0], "lng": CORNER[1],
+                                       "heading": 90.0, "heading_out": 0.0})
+    return e.model_copy(update={"points": [p], "polyline": _encode(ROUTE)})
+
+
+def _client(locate) -> StreetViewClient:
+    """metadata は locate(要求座標) が返す位置にパノラマがあると答える。"""
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path.endswith("/metadata"):
+            lat, lng = (float(v) for v in req.url.params["location"].split(","))
+            plat, plng = locate(lat, lng)
+            return httpx.Response(200, json={"status": "OK", "pano_id": f"P{plat:.6f},{plng:.6f}",
+                                             "copyright": "© 2026 Google", "location": {"lat": plat, "lng": plng}})
+        assert req.url.params["fov"] == "90" and req.url.params["pitch"] == "0"
+        return httpx.Response(200, content=JPEG, headers={"content-type": "image/jpeg"})
+    return StreetViewClient("k", http=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+def test_経路があれば進行方向だけを向き_角より手前から撮る(tmp_path: Path) -> None:
+    from app.services.creator.streetview import TRAVEL_MODE, fetch_candidates
+    e2, _ = fetch_candidates(_client(lambda lat, lng: (lat, lng)), _turn_exploration(), tmp_path)
+    cands = e2.points[0].candidates
+    assert len(cands) == 8
+    assert all(c.heading_mode == TRAVEL_MODE for c in cands)
+    assert all(abs(c.street_view.heading - 90.0) < 1.0 for c in cands)  # 曲がる先（北）へ回さない
+    assert all(c.street_view.offset_m > 0 for c in cands)  # 角より手前
+
+
+def test_経路から離れたパノラマは使わない(tmp_path: Path) -> None:
+    from app.services.creator.streetview import fetch_candidates
+    off = lambda lat, lng: (lat - 0.0003, lng)  # 約 33 m 南（別の道）
+    e2, _ = fetch_candidates(_client(off), _turn_exploration(), tmp_path)
+    assert e2.points[0].candidates == [] and e2.points[0].image is None
+
+
+def test_角を越えた先のパノラマは使わない(tmp_path: Path) -> None:
+    from app.services.creator.streetview import fetch_candidates
+    past = lambda lat, lng: (CORNER[0] + 0.0002, CORNER[1])  # 角を曲がった先 約 22 m
+    e2, _ = fetch_candidates(_client(past), _turn_exploration(), tmp_path)
+    assert e2.points[0].candidates == []

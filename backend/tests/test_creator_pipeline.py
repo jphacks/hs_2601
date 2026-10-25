@@ -39,6 +39,8 @@ def test_写真入力から全工程を回し_工程を順に知らせる(tmp_pa
     assert [p.creator_photo.id for p in r.exploration.points if p.creator_photo] == ["p0", "p1"]
     saved = json.loads((tmp_path / "route.json").read_text(encoding="utf-8"))
     assert len(saved["points"]) == len(r.exploration.points) and (tmp_path / "contact.html").is_file()
+    route_map = (tmp_path / "map.html").read_text(encoding="utf-8")
+    assert "leaflet" in route_map.lower() and "polyline" in route_map.lower()  # 経路線と地点の地図
 
 
 def test_VLMが作れなくてもフォールバック文で続ける(tmp_path: Path) -> None:

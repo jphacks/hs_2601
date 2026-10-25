@@ -23,6 +23,7 @@ from app.schemas.creator_input import PlanInput, goal_from_last_photo
 from app.schemas.exploration import Exploration, Place
 from app.services.creator.arrow import draw_arrows
 from app.services.creator.cache import FileCache
+from app.services.creator.route_map import render_route_map
 from app.services.creator.contact import render_contact_html
 from app.services.creator.geocode import geocode_queries, resolve_places
 from app.services.creator.landmark import evaluate_landmarks
@@ -190,9 +191,10 @@ def route_title(r: PipelineResult) -> str:
 
 
 def write_route_files(r: PipelineResult, out_dir: Path) -> None:
-    """route.json と contact.html（一覧）を書く。地図（map.html）は CLI 側で書く。"""
+    """中間ファイル route.json・contact.html（候補画像の一覧）・map.html（経路線と地点の地図）を書く。"""
     (out_dir / "route.json").write_text(r.exploration.model_dump_json(indent=2), encoding="utf-8")
     (out_dir / "contact.html").write_text(render_contact_html(r.exploration, route_title(r)), encoding="utf-8")
+    (out_dir / "map.html").write_text(render_route_map(r.exploration, route_title(r)), encoding="utf-8")
 
 
 @dataclass(frozen=True)

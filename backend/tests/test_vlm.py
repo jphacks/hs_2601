@@ -135,7 +135,7 @@ def test_fallback_text_とプロンプト() -> None:
     assert fallback_text(p) == "左折（次まで 50 m）"
     prompt = build_prompt(p, 3)
     assert "3 枚" in prompt and "左折" in prompt and "best_index" in prompt and "here_score" in prompt and "等間隔" in prompt
-    assert "グループ: なし" in prompt  # 候補が無いときはグループなし
+    assert "通常は無し）: なし" in prompt  # 候補が無いときはグループなし
 
 
 def test_撮影地点グループがプロンプトに入る() -> None:

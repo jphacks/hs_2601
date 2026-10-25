@@ -74,3 +74,44 @@ def destination_point(p: LatLngT, bearing: float, distance_m: float) -> LatLngT:
     lat2 = math.asin(math.sin(lat1) * math.cos(d) + math.cos(lat1) * math.sin(d) * math.cos(br))
     lng2 = lng1 + math.atan2(math.sin(br) * math.sin(d) * math.cos(lat1), math.cos(d) - math.sin(lat1) * math.sin(lat2))
     return (math.degrees(lat2), math.degrees(lng2))
+
+
+def project_to_path(path: list[LatLngT], p: LatLngT) -> tuple[float, float]:
+    """p を経路に下ろした (経路からの距離 m, 経路の始点からの弧長 m)。局所的な平面近似で計算する。"""
+    cum = cumulative_m(path)
+    best = (float("inf"), 0.0)
+    k = 111_320.0  # 緯度 1 度あたりの m
+    for i in range(len(path) - 1):
+        (a_lat, a_lng), (b_lat, b_lng) = path[i], path[i + 1]
+        cos_lat = math.cos(math.radians(a_lat))
+        bx, by = (b_lng - a_lng) * k * cos_lat, (b_lat - a_lat) * k
+        px, py = (p[1] - a_lng) * k * cos_lat, (p[0] - a_lat) * k
+        seg2 = bx * bx + by * by
+        t = 0.0 if seg2 == 0 else max(0.0, min(1.0, (px * bx + py * by) / seg2))
+        d = math.hypot(px - t * bx, py - t * by)
+        if d < best[0]:
+            best = (d, cum[i] + t * (cum[i + 1] - cum[i]))
+    return best
+
+
+def point_at(path: list[LatLngT], arc_m: float) -> LatLngT:
+    """経路の弧長 arc_m の地点（範囲外は端に丸める）。"""
+    cum = cumulative_m(path)
+    arc_m = max(0.0, min(cum[-1], arc_m))
+    for i in range(len(path) - 1):
+        if cum[i] <= arc_m <= cum[i + 1]:
+            seg = cum[i + 1] - cum[i]
+            t = 0.0 if seg <= 0 else (arc_m - cum[i]) / seg
+            return (path[i][0] + (path[i + 1][0] - path[i][0]) * t, path[i][1] + (path[i + 1][1] - path[i][1]) * t)
+    return path[-1]
+
+
+def travel_heading(path: list[LatLngT], arc_m: float, ahead_m: float = 8.0, stop_m: float | None = None) -> float | None:
+    """弧長 arc_m の地点で歩く向き（その少し先を見る方位）。
+    stop_m（曲がり角の弧長）を越えては見ない。越えるときは手前の区間の向きにする。経路の終端でも同じ。"""
+    end = cumulative_m(path)[-1] if stop_m is None else min(stop_m, cumulative_m(path)[-1])
+    b = min(arc_m + ahead_m, end)
+    a = min(arc_m, b - ahead_m) if b - arc_m < ahead_m else arc_m
+    a = max(0.0, a)
+    pa, pb = point_at(path, a), point_at(path, b)
+    return bearing_deg(pa, pb) if haversine_m(pa, pb) > 0.5 else None

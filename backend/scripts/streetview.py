@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import argparse
-import html
 from pathlib import Path
 
 from app.core.config import get_settings
@@ -21,24 +20,14 @@ from app.external.google.street_view import StreetViewClient
 from app.schemas.exploration import Exploration
 from app.services.creator.contact import TURN_LABEL, render_contact_html
 from scripts.snapshot_map import write_snapshots
-from app.services.creator.mapview import MapSpec, Marker, render_map_html
+from app.services.creator.route_map import render_route_map
 from app.services.creator.route import decode_polyline
 from app.core.config import get_settings as _gs  # noqa: F401
 from app.services.creator.cache import FileCache
 from app.services.creator.streetview import StreetViewOptions, fetch_candidates, fetch_images
 
-COLOR = {"left": "orange", "right": "purple", "straight": "blue", "arrive": "red"}
-
-
 def build_map(e: Exploration, title: str) -> str:
-    markers = []
-    for p in e.points:
-        color = "green" if p.maneuver.upper() == "DEPART" else COLOR[p.turn]
-        shown = p.arrow_image or p.image
-        img = f'<br><img src="{html.escape(shown)}" width="280">' if shown else "<br>(Street View なし)"
-        popup = f"<b>{p.index} {TURN_LABEL[p.turn]}</b> 次まで {p.distance_to_next_m} m<br>{html.escape(p.instruction)}{img}"
-        markers.append(Marker(p.lat, p.lng, str(p.index), popup, color))
-    return render_map_html(MapSpec(title=title, markers=markers, path=decode_polyline(e.polyline)))
+    return render_route_map(e, title)
 
 
 def main() -> None:
