@@ -58,3 +58,15 @@ class RoutePlanRecord(BaseModel):
     origin: str
     destination: str
     plan: RoutePlan
+    creator_id: str | None = None  # 作る人のブラウザのランダム ID（一覧の絞り込み用）。CLI で作った行は None
+
+
+class RoutePlanSummary(BaseModel):
+    """一覧用の 1 行（plan_json を含まない）。"""
+
+    id: str
+    name: str
+    status: PlanStatus
+    origin: str
+    destination: str
+    created_at: str | None = None  # ISO 8601（DB の timestamptz）
