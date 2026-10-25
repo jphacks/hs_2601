@@ -1,3 +1,4 @@
+import { formatDateTime } from '../../shared/lib/datetime'
 import type { RouteSummary } from '../../shared/types/creator'
 import { buttonClass } from './styles'
 
@@ -42,11 +43,23 @@ export function RoutePublishList({
             onChange={(e) => onToggle(route.id, e.target.checked)}
           />
           <div className="flex-1">
-            <label htmlFor={`route-${route.id}`} className="block font-semibold">
-              {route.origin} → {route.destination}
+            <label htmlFor={`route-${route.id}`} className="block font-semibold break-all">
+              {route.name}
             </label>
-            <span className="mt-1 block text-sm text-stone-500">
-              {route.status === 'published' ? '公開済み' : '下書き'}
+            <span className="mt-1 block text-sm text-stone-600">
+              {route.origin} → {route.destination}
+            </span>
+            <span className="mt-1 flex items-center gap-2 text-xs text-stone-500">
+              <span
+                className={`rounded-full px-2 py-0.5 font-semibold ${
+                  route.status === 'published'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-stone-200 text-stone-700'
+                }`}
+              >
+                {route.status === 'published' ? '公開済み' : '下書き'}
+              </span>
+              <time dateTime={route.createdAt}>{formatDateTime(route.createdAt)}</time>
             </span>
             <button
               className="mt-2 text-sm text-emerald-700 underline"
@@ -67,7 +80,7 @@ export function RoutePublishList({
         disabled={selected.length === 0 || publishing}
         onClick={onPublish}
       >
-        {publishing ? '公開しています...' : '選択した道を公開する'}
+        {publishing ? '公開しています...' : '選択した道を公開する（QR を表示）'}
       </button>
     </section>
   )

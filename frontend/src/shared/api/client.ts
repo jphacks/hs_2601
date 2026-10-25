@@ -8,6 +8,12 @@ const DEFAULT_BASE_URL = 'http://localhost:8000'
 /** 末尾の / を落として、path 側の先頭 / と二重にならないようにする */
 const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, '')
 
+/** API のパス（`/api/...`）を完全な URL にする。`<img src>` 用。すでに完全な URL ならそのまま */
+export function apiUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) return path
+  return `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly body: unknown
@@ -44,7 +50,7 @@ export async function request<T>(
   { method = 'GET', body, signal }: RequestOptions = {},
 ): Promise<T> {
   const isForm = body instanceof FormData
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(apiUrl(path), {
     method,
     headers: isForm || body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: isForm ? body : body === undefined ? undefined : JSON.stringify(body),

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { routeApi } from '../../shared/api/endpoints'
+import { apiErrorMessage } from '../../shared/api/errors'
 import type { PublishResult, RouteSummary } from '../../shared/types/creator'
 import { getOrCreateCreatorId } from '../storage/creatorId'
 
@@ -21,7 +22,7 @@ export function useRouteList(
         if (!cancelled) setRoutes(list)
       })
       .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : '一覧を取得できませんでした')
+        if (!cancelled) setError(apiErrorMessage(e, '一覧を取得できませんでした'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -44,7 +45,7 @@ export function useRouteList(
       setSelected([])
       onPublished(results, routes)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '公開に失敗しました')
+      setError(apiErrorMessage(e, '公開に失敗しました'))
     } finally {
       setPublishing(false)
     }

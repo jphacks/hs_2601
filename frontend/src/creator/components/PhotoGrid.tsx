@@ -1,18 +1,20 @@
-import type { CapturedPhoto } from '../types'
+import { locationLabel, photoLocationStatus } from '../photoLocation'
+import type { CapturedPhoto, PhotoLocationStatus } from '../types'
 
 interface Props {
   photos: CapturedPhoto[]
   onRemove: (photo: CapturedPhoto) => void
+  onRetryLocation: (photo: CapturedPhoto) => void
 }
 
-function locationLabel(photo: CapturedPhoto): string {
-  if (photo.lat !== undefined) return '位置情報取得済み'
-  if (photo.locationError) return `位置情報未取得（${photo.locationError}）`
-  return '位置情報を取得中...'
+const STATUS_CLASS: Record<PhotoLocationStatus['kind'], string> = {
+  ok: 'text-emerald-700',
+  acquiring: 'text-stone-500',
+  failed: 'text-red-700',
 }
 
-/** 作成画面の目印写真サムネイル一覧 */
-export function PhotoGrid({ photos, onRemove }: Props) {
+/** 作成画面の目印写真サムネイル一覧。位置情報の状態と、取れなかったときの取り直しボタンを出す */
+export function PhotoGrid({ photos, onRemove, onRetryLocation }: Props) {
   if (photos.length === 0) {
     return (
       <div className="rounded-xl bg-stone-50 p-6 text-center text-sm text-stone-500">
@@ -23,22 +25,35 @@ export function PhotoGrid({ photos, onRemove }: Props) {
 
   return (
     <div className="grid grid-cols-2 gap-3">
-      {photos.map((photo, index) => (
-        <div key={photo.id} className="overflow-hidden rounded-xl border">
-          <img
-            src={photo.preview}
-            alt={`目印 ${index + 1}`}
-            className="h-36 w-full object-cover"
-          />
-          <div className="p-2">
-            <p className="text-xs font-medium">目印 {index + 1}</p>
-            <p className="mt-1 text-xs text-stone-500">{locationLabel(photo)}</p>
-            <button className="mt-2 text-sm text-red-600" onClick={() => onRemove(photo)}>
-              削除
-            </button>
+      {photos.map((photo, index) => {
+        const status = photoLocationStatus(photo)
+        return (
+          <div
+            key={photo.id}
+            className={`overflow-hidden rounded-xl border ${status.kind === 'failed' ? 'border-red-300' : ''}`}
+          >
+            <img
+              src={photo.preview}
+              alt={`目印 ${index + 1}`}
+              className="h-36 w-full object-cover"
+            />
+            <div className="p-2">
+              <p className="text-xs font-medium">目印 {index + 1}</p>
+              <p className={`mt-1 text-xs ${STATUS_CLASS[status.kind]}`}>{locationLabel(status)}</p>
+              <div className="mt-2 flex gap-3">
+                {status.kind === 'failed' && (
+                  <button className="text-sm text-emerald-700" onClick={() => onRetryLocation(photo)}>
+                    位置を取り直す
+                  </button>
+                )}
+                <button className="text-sm text-red-600" onClick={() => onRemove(photo)}>
+                  削除
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

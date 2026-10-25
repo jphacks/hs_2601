@@ -24,9 +24,12 @@ export function CreatingPage() {
         <button className={secondaryClass} onClick={() => navigate('/c/new')}>
           写真一覧に戻る
         </button>
+        <button className={secondaryClass} onClick={() => navigate('/c/routes')}>
+          作った道の一覧を見る
+        </button>
       </section>
     )
   }
 
-  return <RouteLoading />
+  return <RouteLoading step={polling.status === 'running' ? polling.step : null} />
 }
